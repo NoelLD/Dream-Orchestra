@@ -64,7 +64,8 @@ Die Szene stammt aus dem Dream-Labs-Beispiel `dream_library/examples/yam_mujoco`
 | Methode | Pfad | Zweck | Anforderung |
 |---|---|---|---|
 | `GET` | `/health` | Läuft der Dienst, ist der Key gesetzt, welche Modi, aktiver Lauf | N6 |
-| `GET` | `/skills` | Skills mit Standard-Prompt und Erfolgsprüfung | Datenmodell Skill |
+| `GET` | `/skills` | Skills mit Standard-Prompt, Roboter und Erfolgsprüfung | Datenmodell Skill |
+| `GET` | `/robots`, `/robots/{name}` | Robotertypen: Embodiment, Skills, aktiver Checkpoint, Fine-Tune-Jobs | Training |
 | `POST` | `/runs` | Skill-Lauf starten | F6 |
 | `GET` | `/runs` | Letzte Läufe, neueste zuerst (`?limit=50`) | F14 |
 | `GET` | `/runs/{run_id}` | Status, Erfolg, Dauer, Aufrufe, Kosten | F6, F14, F15 |
@@ -96,7 +97,22 @@ Die Szene stammt aus dem Dream-Labs-Beispiel `dream_library/examples/yam_mujoco`
 | `banana-to-plate` | put the banana on the plate | Banane liegt ruhig ≤ 8 cm um die Tellermitte | nein |
 | `apple-to-bowl` | put the apple into the bowl | Apfel liegt ruhig ≤ 7 cm um die Schalenmitte | nein |
 
-Jeder Eintrag hat `name`, `description`, `default_prompt`, `fine_tuned_model`, `success_check` und `mock_available`, passend zur Tabelle `skills` in `src/Backend/models/schema.sql`.
+Jeder Eintrag hat `name`, `description`, `default_prompt`, `robot`, `fine_tuned_model`, `success_check` und `mock_available`, passend zur Tabelle `skills` in `src/Backend/models/schema.sql`. `fine_tuned_model` ist der aktive Checkpoint des **Roboters** dieses Skills (`null` = Basismodell), siehe `GET /robots`.
+
+### `GET /robots`
+
+**Ein Fine-Tune gehört zum Robotertyp, nicht zum Skill.** Dream Labs: *"Fine-tuning is for new robots, not for automating a task. It teaches Dream-1 your robot's body."* Ein Dataset enthält Vorführungen aller Skills des Roboters (jede Episode mit eigenem Prompt). Der Checkpoint gilt dann für alle seine Skills.
+
+```json
+[{"name": "yam-sim", "description": "Two YAM arms in the Dream Labs MuJoCo scene (simulation)",
+  "embodiment": "yam-sim", "cameras": ["overhead", "wrist_l", "wrist_r"],
+  "skills": ["pick-banana", "pick-apple", "banana-to-plate", "apple-to-bowl"],
+  "fine_tuned_model": null,
+  "finetune_jobs": [{"job_id": "ftj_…", "status": "running", "dataset": "pick-both-v2", "suffix": "yam-sim-v1",
+                     "steps": 500, "price_usd": 100.0, "fine_tuned_model": null, "created_at": "…"}]}]
+```
+
+`fine_tuned_model` = neuester fertiger Fine-Tune dieses Roboters. Er wird gesetzt, sobald `GET /finetune/{job_id}` ihn gemeldet hat. Ein Lauf nutzt ihn nur, wenn er ausdrücklich als `checkpoint` übergeben wird; laufende Workflows werden nie stillschweigend umgestellt.
 
 ### `POST /runs`
 
@@ -198,8 +214,8 @@ Wie zuverlässig ist ein Skill mit welchem Prompt, welchem Modell und welcher Wi
 | `POST /datasets` | `{"name": "pick-v2", "episodes": 10, "randomize": true, "seed": 0, "backend": "local"}` | `202`, Datensatz-Eintrag mit `status: "generating"` |
 | `GET /datasets/{name}` | – | `status` (`generating` → `validated` → `uploading` → `processing` → `processed`, oder `failed` mit `error`), dazu `sessions`, `episodes`, `frames`, `validation`, `dream_dataset_id` und `dream_status` |
 | `POST /datasets/{name}/upload` | – | `202`. Registriert bei Bedarf das Embodiment `yam-sim`, lädt hoch und fragt den Status ab |
-| `POST /finetune` | `{"dataset": "pick-v1", "suffix": "pick-v1", "steps": 500, "lr_schedule": "cosine", "confirm_cost_usd": 100}` | `202` mit `{"job_id": "ftj_…", "status": "queued", "price_usd": 100}` |
-| `GET /finetune/{job_id}` | – | `status`, `progress` (`phase`, `step`, `total_steps`, `loss`) und `fine_tuned_model`, sobald fertig |
+| `POST /finetune` | `{"robot": "yam-sim", "dataset": "pick-both-v2", "suffix": "yam-sim-v1", "steps": 500, "lr_schedule": "cosine", "confirm_cost_usd": 100}` (`robot` optional, Standard `yam-sim`) | `202` mit `{"job_id": "ftj_…", "robot": "yam-sim", "status": "queued", "price_usd": 100}`; `404 unknown_robot` |
+| `GET /finetune/{job_id}` | – | `robot`, `status`, `progress` (`phase`, `step`, `total_steps`, `loss`) und `fine_tuned_model`, sobald fertig (wird dann der Checkpoint des Roboters) |
 
 - `backend: "local"` erzeugt im Container, etwa 2,5 min pro Episode. `backend: "modal"` geht nur vom Host aus: `modal run src/Simulation/tools/modal_gen.py --name <name> --count <n>` (ein Container pro Episode, Minuten, ~0,003 $ pro Episode). Im Container antwortet die API dafür mit `501` und nennt den Befehl.
 - Fehlgeschlagene Simulationsversuche werden nie exportiert.

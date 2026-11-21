@@ -19,7 +19,7 @@ class Skill:
     obj: str
     target: str | None = None  # body the object must end on/in; None = lift only
     mock_yaw: float | None = None  # scripted pickup available (mock mode) when set
-    fine_tuned_model: str | None = None
+    robot: str = "yam-sim"  # the robot type this task runs on; its fine-tune is the robot's (app/robots.py)
     extra: dict = field(default_factory=dict)
 
     @property
@@ -32,12 +32,14 @@ class Skill:
             return f"{self.obj} lifted >= {TABLE_LIFT_M} m above its start"
         return f"{self.obj} resting within {PLACE_RADIUS_M[self.target]} m of the {self.target} centre"
 
-    def public(self) -> dict:
+    def public(self, fine_tuned_model: str | None = None) -> dict:
+        """fine_tuned_model: the active checkpoint of this skill's robot (None = base model)."""
         return {
             "name": self.name,
             "description": self.description,
             "default_prompt": self.default_prompt,
-            "fine_tuned_model": self.fine_tuned_model,
+            "robot": self.robot,
+            "fine_tuned_model": fine_tuned_model,
             "success_check": self.success_check,
             "mock_available": self.mock_available,
         }

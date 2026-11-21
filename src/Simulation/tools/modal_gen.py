@@ -16,7 +16,10 @@ from pathlib import Path
 
 import modal
 
-SERVICE = Path(__file__).resolve().parents[1]  # src/Simulation
+# Host paths only: inside the container this file is /root/modal_gen.py, so parents[1] would be "/" and
+# SERVICE.parents[1] raised IndexError at import (every container crash-looped on startup).
+# The container never reads these (the image is already built); any path deep enough for parents[1] works.
+SERVICE = Path(__file__).resolve().parents[1] if modal.is_local() else Path("/unused/src/Simulation")
 EXAMPLE = SERVICE.parents[1] / "vendor/dreamlabs/dream_library/examples/yam_mujoco"
 DATASETS = SERVICE / "data/datasets"
 

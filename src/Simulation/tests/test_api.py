@@ -40,6 +40,17 @@ def test_skills_have_success_checks():
     assert skills["pick-banana"]["mock_available"] and not skills["banana-to-plate"]["mock_available"]
 
 
+def test_robots_own_skills_and_checkpoint():
+    robots = {r["name"]: r for r in client.get("/robots").json()}
+    yam = robots["yam-sim"]
+    assert {"pick-banana", "pick-apple"} <= set(yam["skills"]) and yam["embodiment"] == "yam-sim"
+    assert yam["fine_tuned_model"] is None  # no finished fine-tune in a fresh data dir: base model
+    skills = {s["name"]: s for s in client.get("/skills").json()}
+    assert skills["pick-banana"]["robot"] == "yam-sim" and skills["pick-banana"]["fine_tuned_model"] is None
+    missing = client.get("/robots/nope")
+    assert missing.status_code == 404 and missing.json()["error"] == "unknown_robot"
+
+
 @pytest.mark.parametrize("payload,status,error", [
     ({"skill": "nope", "mode": "mock"}, 404, "unknown_skill"),
     ({"skill": "pick-banana", "mode": "mock", "prompt": "   "}, 400, "invalid_request"),

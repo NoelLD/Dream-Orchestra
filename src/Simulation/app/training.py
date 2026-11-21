@@ -132,7 +132,9 @@ class TrainingState:
         self.save()
 
     # ---- fine-tuning ---------------------------------------------------------------------------------------
-    def finetune(self, dataset: str, suffix: str, steps: int, lr_schedule: str, confirm_cost_usd: float) -> dict:
+    def finetune(self, dataset: str, suffix: str, steps: int, lr_schedule: str, confirm_cost_usd: float,
+                 robot: str = "yam-sim") -> dict:
+        """One fine-tune per robot type: the job and its checkpoint are recorded under `robot`."""
         from dream import fine_tuning
 
         price = round(steps * config.PRICE_PER_FINETUNE_STEP_USD, 2)
@@ -142,10 +144,21 @@ class TrainingState:
         if not record or record.get("status") != "processed" or not record.get("dream_dataset_name"):
             raise ConflictError(f"dataset {dataset} is not processed at Dream Labs yet")
         job = fine_tuning.create(record["dream_dataset_name"], suffix, steps=steps, lr_schedule=lr_schedule)
-        self.jobs[job["id"]] = {"job_id": job["id"], "dataset": dataset, "suffix": suffix, "steps": steps,
-                                "price_usd": price, "created_at": job.get("created_at")}
+        self.jobs[job["id"]] = {"job_id": job["id"], "robot": robot, "dataset": dataset, "suffix": suffix,
+                                "steps": steps, "price_usd": price, "created_at": job.get("created_at")}
         self.save()
         return job
+
+
+    def record_job_status(self, job: dict) -> None:
+        """Keep the latest Dream status of a known job; a set fine_tuned_model becomes its robot's checkpoint."""
+        record = self.jobs.get(job["id"])
+        if record is None:
+            return
+        update = {k: job.get(k) for k in ("status", "fine_tuned_model", "finished_at") if job.get(k) is not None}
+        if any(record.get(k) != v for k, v in update.items()):
+            record.update(update)
+            self.save()
 
 
 class ConflictError(Exception):

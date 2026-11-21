@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from . import config
 from .evals import EvalManager
+from .robots import DEFAULT_ROBOT, ROBOTS, active_checkpoint
 from .runner import AlreadyFinishedError, BusyError, RunManager, RunSpec
 from .skills import SKILLS
 from .training import ConflictError, NotFoundError, TrainingState, modal_available
@@ -114,6 +115,7 @@ class FinetuneRequest(BaseModel):
     steps: int = Field(500, ge=500, le=10000, multiple_of=100)
     lr_schedule: Literal["constant", "cosine"] = "cosine"
     confirm_cost_usd: float
+    robot: str = DEFAULT_ROBOT  # fine-tunes belong to a robot type (GET /robots)
 
 
 # ---- health & skills ------------------------------------------------------------------------------------------
@@ -134,7 +136,30 @@ def demo():
 
 @app.get("/skills")
 def list_skills():
-    return [s.public() for s in SKILLS.values()]
+    return [s.public(active_checkpoint(s.robot, training.jobs)) for s in SKILLS.values()]
+
+
+def robot_public(robot) -> dict:
+    jobs = [j for j in training.jobs.values() if j.get("robot", DEFAULT_ROBOT) == robot.name]
+    return {"name": robot.name, "description": robot.description, "embodiment": robot.embodiment,
+            "cameras": list(robot.cameras), "skills": [s.name for s in SKILLS.values() if s.robot == robot.name],
+            "fine_tuned_model": active_checkpoint(robot.name, training.jobs),
+            "finetune_jobs": [{k: j.get(k) for k in ("job_id", "status", "dataset", "suffix", "steps", "price_usd",
+                                                     "fine_tuned_model", "created_at")} for j in jobs]}
+
+
+@app.get("/robots")
+def list_robots():
+    """Robot types; a fine-tune is started per robot type and its checkpoint serves all of the robot's skills."""
+    return [robot_public(r) for r in ROBOTS.values()]
+
+
+@app.get("/robots/{name}")
+def get_robot(name: str):
+    robot = ROBOTS.get(name)
+    if robot is None:
+        raise ApiError(404, "unknown_robot", f"no robot {name!r}; see GET /robots")
+    return robot_public(robot)
 
 
 # ---- runs -----------------------------------------------------------------------------------------------------
@@ -245,15 +270,19 @@ def upload_dataset(name: str):
 def start_finetune(req: FinetuneRequest):
     if not config.dream_key_set():
         raise ApiError(503, "no_api_key", "DREAM_API_KEY is not set in the simulation container")
+    if req.robot not in ROBOTS:
+        raise ApiError(404, "unknown_robot", f"no robot {req.robot!r}; see GET /robots")
     try:
-        job = training.finetune(req.dataset, req.suffix, req.steps, req.lr_schedule, req.confirm_cost_usd)
+        job = training.finetune(req.dataset, req.suffix, req.steps, req.lr_schedule, req.confirm_cost_usd,
+                                robot=req.robot)
     except ValueError as error:
         raise ApiError(400, "cost_not_confirmed", str(error))
     except ConflictError as error:
         raise ApiError(409, "dataset_not_ready", str(error))
     except Exception as error:  # Dream service refusals (payment_required, conflict, ...)
         raise ApiError(502, getattr(error, "code", None) or "dream_error", str(error)[:300])
-    return {"job_id": job["id"], "status": job["status"], "price_usd": round(req.steps * 0.2, 2)}
+    return {"job_id": job["id"], "robot": req.robot, "status": job["status"],
+            "price_usd": round(req.steps * 0.2, 2)}
 
 
 @app.get("/finetune")
@@ -270,7 +299,9 @@ def get_finetune(job_id: str):
     except Exception as error:
         code = getattr(error, "code", None)
         raise ApiError(404 if code == "not_found" else 502, code or "dream_error", str(error)[:300])
-    return {"job_id": job["id"], "status": job["status"], "progress": job.get("progress"),
+    training.record_job_status(job)
+    robot = training.jobs.get(job["id"], {}).get("robot")
+    return {"job_id": job["id"], "robot": robot, "status": job["status"], "progress": job.get("progress"),
             "fine_tuned_model": job.get("fine_tuned_model"), "error": job.get("error"),
             "created_at": job.get("created_at"), "started_at": job.get("started_at"),
             "finished_at": job.get("finished_at")}
