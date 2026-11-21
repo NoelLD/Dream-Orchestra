@@ -25,7 +25,7 @@ RENDER_SHADOWS = os.environ.get("SIM_RENDER_SHADOWS", "0") == "1"  # off: ~3x fa
 PRICE_PER_CALL_USD = {"base": 0.0014, "fine_tuned": 0.0028}
 PRICE_PER_FINETUNE_STEP_USD = 0.20
 # Hard cap on estimated Dream inference spend of this service (all runs, survives restarts via data/runs).
-BUDGET_USD = float(os.environ.get("SIM_BUDGET_USD", "10"))
+BUDGET_USD = float(os.environ.get("SIM_BUDGET_USD", "20"))  # inference guard; raised for the fine-tune evals (FINETUNE_SERIES.md)
 CORS_ORIGINS = os.environ.get("SIM_CORS_ORIGINS", "http://localhost:8080,http://127.0.0.1:8080").split(",")
 
 BASE_CHECKPOINTS = ("dreamlabs/dream-1-beta", "dreamlabs/dream-1-beta-flash")

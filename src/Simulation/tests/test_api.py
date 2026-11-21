@@ -118,6 +118,8 @@ def test_mock_eval_reports_rates_with_wilson_interval():
     summary = body["summary"][0]
     assert summary["n"] == 1 and summary["success_rate"] == 1.0 and summary["cost_usd"] == 0.0
     assert summary["ci95"][1] == 1.0 and 0 < summary["ci95"][0] < 1
+    pair = body["paired"]  # comparison on the seeds every variant finished without an infrastructure error
+    assert pair["common_seeds"] == 1 and pair["excluded_seeds"] == [] and pair["variants"][0]["successes"] == 1
 
 
 def test_eval_rejects_duplicate_labels_and_training_seeds():
@@ -135,3 +137,13 @@ def test_demo_page_and_cors_for_frontend():
     preflight = client.options("/runs", headers={"Origin": "http://localhost:8080",
                                                  "Access-Control-Request-Method": "POST"})
     assert preflight.headers.get("access-control-allow-origin") == "http://localhost:8080"
+
+
+def test_finetune_validates_new_knobs_before_spending():
+    # without a key the service refuses first (503); knob validation happens in the request model (400)
+    bad = client.post("/finetune", json={"dataset": "x", "suffix": "x", "steps": 500, "confirm_cost_usd": 100,
+                                         "base_share": 0.3})
+    assert bad.status_code == 400 and bad.json()["error"] == "invalid_request"
+    bad = client.post("/finetune", json={"dataset": "x", "suffix": "x", "steps": 500, "confirm_cost_usd": 100,
+                                         "resume_from": "not-a-model"})
+    assert bad.status_code == 400

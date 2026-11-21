@@ -14,6 +14,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from . import config
 from .evals import EvalManager
+
+log = logging.getLogger("simulation.api")
 from .robots import DEFAULT_ROBOT, ROBOTS, active_checkpoint
 from .runner import AlreadyFinishedError, BusyError, RunManager, RunSpec
 from .skills import SKILLS
@@ -114,8 +116,11 @@ class FinetuneRequest(BaseModel):
     suffix: str = Field(pattern=r"^[a-z0-9-]{1,40}$")
     steps: int = Field(500, ge=500, le=10000, multiple_of=100)
     lr_schedule: Literal["constant", "cosine"] = "cosine"
-    confirm_cost_usd: float
+    confirm_cost_usd: float = Field(gt=0, allow_inf_nan=False)
     robot: str = DEFAULT_ROBOT  # fine-tunes belong to a robot type (GET /robots)
+    base_share: Literal[0.0, 0.5] | None = None  # share of Dream Labs' own data per batch; Dream default 0.5
+    learning_rate: float | None = Field(None, ge=1e-6, le=1e-4)  # Dream default 1e-5
+    resume_from: str | None = Field(None, pattern=r"^dream-1-ft:[A-Za-z0-9-]+$")  # continue a finished model
 
 
 # ---- health & skills ------------------------------------------------------------------------------------------
@@ -272,9 +277,12 @@ def start_finetune(req: FinetuneRequest):
         raise ApiError(503, "no_api_key", "DREAM_API_KEY is not set in the simulation container")
     if req.robot not in ROBOTS:
         raise ApiError(404, "unknown_robot", f"no robot {req.robot!r}; see GET /robots")
+    if req.resume_from and req.lr_schedule != "constant":
+        raise ApiError(400, "invalid_request", "resume_from needs lr_schedule 'constant' (Dream Labs rule)")
     try:
         job = training.finetune(req.dataset, req.suffix, req.steps, req.lr_schedule, req.confirm_cost_usd,
-                                robot=req.robot)
+                                robot=req.robot, base_share=req.base_share, learning_rate=req.learning_rate,
+                                resume_from=req.resume_from)
     except ValueError as error:
         raise ApiError(400, "cost_not_confirmed", str(error))
     except ConflictError as error:
@@ -286,7 +294,18 @@ def start_finetune(req: FinetuneRequest):
 
 
 @app.get("/finetune")
-def list_finetunes():
+def list_finetunes(refresh: bool = True):
+    """Our jobs. refresh=true asks Dream for every job not yet terminal (free calls) and stores the answer."""
+    if refresh and config.dream_key_set():
+        from dream import fine_tuning
+
+        for job_id, record in list(training.jobs.items()):
+            if record.get("status") in ("failed", "cancelled") or record.get("fine_tuned_model"):
+                continue  # final: refused, or the published model is known
+            try:
+                training.record_job_status(fine_tuning.get(job_id))
+            except Exception as error:  # keep the stored record; report nothing new for this job
+                log.warning("finetune refresh %s: %s", job_id, error)
     return list(training.jobs.values())
 
 
@@ -302,6 +321,7 @@ def get_finetune(job_id: str):
     training.record_job_status(job)
     robot = training.jobs.get(job["id"], {}).get("robot")
     return {"job_id": job["id"], "robot": robot, "status": job["status"], "progress": job.get("progress"),
+            "base_model": job.get("base_model"), "hyperparameters": job.get("hyperparameters"),
             "fine_tuned_model": job.get("fine_tuned_model"), "error": job.get("error"),
             "created_at": job.get("created_at"), "started_at": job.get("started_at"),
             "finished_at": job.get("finished_at")}

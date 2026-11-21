@@ -53,6 +53,35 @@ def summarize(label: str, results: list[dict]) -> dict:
     }
 
 
+INFRA_STATUSES = ("error",)  # network/API failures: excluded pairwise, never counted as a model failure
+
+
+def paired(results: dict[str, list[dict]], reference: str | None) -> dict:
+    """Compare variants only on the seeds where every variant has a non-error result (pairwise exclusion).
+
+    Per variant: successes on the common seeds; against the reference variant (the first one) the discordant
+    pairs: seeds only the variant solved (`gained`) and seeds only the reference solved (`lost`).
+    """
+    by_seed = {label: {r["seed"]: r for r in rs} for label, rs in results.items()}
+    seeds = sorted(set.intersection(*(set(m) for m in by_seed.values()))) if by_seed else []
+    common = [s for s in seeds if all(by_seed[l][s]["status"] not in INFRA_STATUSES for l in by_seed)]
+    excluded = sorted({r["seed"] for rs in results.values() for r in rs} - set(common))
+    out = {"common_seeds": len(common), "excluded_seeds": excluded, "variants": []}
+    for label, m in by_seed.items():
+        wins = sum(1 for s in common if m[s]["success"])
+        row = {"label": label, "n": len(common), "successes": wins,
+               "success_rate": round(wins / len(common), 3) if common else None, "ci95": wilson(wins, len(common))}
+        if reference and label != reference and reference in by_seed:
+            ref = by_seed[reference]
+            row["vs_reference"] = {
+                "reference": reference,
+                "gained": sum(1 for s in common if m[s]["success"] and not ref[s]["success"]),
+                "lost": sum(1 for s in common if ref[s]["success"] and not m[s]["success"]),
+            }
+        out["variants"].append(row)
+    return out
+
+
 class Evaluation:
     def __init__(self, skill: Skill, variants: list[dict], trials: int, seed_start: int, timeout_s: float, mode: str):
         self.eval_id = "eval_" + uuid.uuid4().hex[:8]
@@ -74,9 +103,11 @@ class Evaluation:
             "timeout_s": self.timeout_s, "progress": {"done": done, "total": total},
             "active_run_id": self.active_run_id, "variants": self.variants,
             "summary": [summarize(label, results) for label, results in self.results.items()],
+            "paired": paired(self.results, self.variants[0]["label"] if self.variants else None),
             "runs": {label: [r["run_id"] for r in results] for label, results in self.results.items()},
             "created_at": self.created_at, "finished_at": self.finished_at, "error": self.error,
-            "note": "simulation results, small n; success is the simulator's verdict",
+            "note": "simulation results, small n; success is the simulator's verdict; cost = estimated inference "
+                    "cost only (no training cost); compare variants via `paired` (common non-error seeds)",
         }
 
 

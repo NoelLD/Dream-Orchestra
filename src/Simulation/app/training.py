@@ -133,29 +133,45 @@ class TrainingState:
 
     # ---- fine-tuning ---------------------------------------------------------------------------------------
     def finetune(self, dataset: str, suffix: str, steps: int, lr_schedule: str, confirm_cost_usd: float,
-                 robot: str = "yam-sim") -> dict:
-        """One fine-tune per robot type: the job and its checkpoint are recorded under `robot`."""
+                 robot: str = "yam-sim", base_share: float | None = None, learning_rate: float | None = None,
+                 resume_from: str | None = None) -> dict:
+        """One fine-tune per robot type: the job and its checkpoint are recorded under `robot`.
+
+        resume_from continues one of our finished models for `steps` more steps (charged for those alone); Dream
+        requires the "constant" schedule and the model's own learning rate and base_share for that.
+        """
         from dream import fine_tuning
 
         price = round(steps * config.PRICE_PER_FINETUNE_STEP_USD, 2)
         if abs(confirm_cost_usd - price) > 1e-6:
             raise ValueError(f"confirm_cost_usd must be {price} for {steps} steps")
+        if resume_from and lr_schedule != "constant":
+            raise ValueError("resume_from needs lr_schedule 'constant' (Dream Labs rule)")
         record = self.datasets.get(dataset)
         if not record or record.get("status") != "processed" or not record.get("dream_dataset_name"):
             raise ConflictError(f"dataset {dataset} is not processed at Dream Labs yet")
-        job = fine_tuning.create(record["dream_dataset_name"], suffix, steps=steps, lr_schedule=lr_schedule)
+        knobs = {"steps": steps, "lr_schedule": lr_schedule}
+        if base_share is not None and not resume_from:  # a continued job keeps its model's value
+            knobs["base_share"] = base_share
+        if learning_rate is not None and not resume_from:
+            knobs["learning_rate"] = learning_rate
+        if resume_from:
+            knobs["resume_from"] = resume_from
+        job = fine_tuning.create(record["dream_dataset_name"], suffix, **knobs)
         self.jobs[job["id"]] = {"job_id": job["id"], "robot": robot, "dataset": dataset, "suffix": suffix,
-                                "steps": steps, "price_usd": price, "created_at": job.get("created_at")}
+                                "price_usd": price, "created_at": job.get("created_at"), **knobs,
+                                "status": job.get("status"), "base_model": job.get("base_model"),
+                                "hyperparameters": job.get("hyperparameters"), "create_response": job}
         self.save()
         return job
-
 
     def record_job_status(self, job: dict) -> None:
         """Keep the latest Dream status of a known job; a set fine_tuned_model becomes its robot's checkpoint."""
         record = self.jobs.get(job["id"])
         if record is None:
             return
-        update = {k: job.get(k) for k in ("status", "fine_tuned_model", "finished_at") if job.get(k) is not None}
+        update = {k: job.get(k) for k in ("status", "fine_tuned_model", "finished_at", "base_model",
+                                          "hyperparameters", "progress", "error") if job.get(k) is not None}
         if any(record.get(k) != v for k, v in update.items()):
             record.update(update)
             self.save()
