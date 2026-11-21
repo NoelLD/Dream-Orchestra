@@ -1,0 +1,5 @@
+services:
+  api-test:
+    build: .
+    image: dreamorchestra-api-test:local
+    env_file: .env
