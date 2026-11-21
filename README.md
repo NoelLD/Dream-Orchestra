@@ -1,6 +1,6 @@
 # DreamOrchestra
 
-Docker Compose startet das Frontend mit Nginx, das Backend mit Python 3.12, den Simulationsdienst mit Node.js 24 und den SQLite-Datenbankdienst.
+Docker Compose startet das Frontend mit Nginx, das Backend mit Python 3.12, den Simulationsdienst mit Python 3.12, MuJoCo und FastAPI und den SQLite-Datenbankdienst. Die API des Simulationsdienstes beschreibt [`src/Simulation/README.md`](src/Simulation/README.md), die Live-Doku liegt unter `http://localhost:3001/docs`.
 
 ## Setup
 
@@ -16,7 +16,8 @@ Für einen einzelnen Dienst beispielsweise `docker compose up --build backend` a
 | --- | --- | --- |
 | `frontend` | `src/Frontend` | `http://localhost:8080` |
 | `backend` | `src/Backend` | `http://localhost:8000/health` |
-| `simulation` | `src/Simulation` | `http://localhost:3001/health` |
+| `simulation` | `src/Simulation` | `http://localhost:3001/health`, API-Doku `http://localhost:3001/docs` |
+| `simulation-gui` (optional, `--profile gui`) | `src/Simulation` | `http://localhost:6080/vnc.html` (MuJoCo-Fenster im Browser) |
 | `database` | `src/Database` | `http://database:8081/health` im Compose-Netz |
 
 Compose bindet jeden Quellordner schreibgeschützt ein. Nach Änderungen am Backend oder Simulationsserver den Dienst neu starten, beispielsweise mit `docker compose restart backend`. `docker compose down` stoppt die Dienste.
