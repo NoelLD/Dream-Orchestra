@@ -11,7 +11,7 @@ from app.dream.client import DreamClient
 from app.engine.engine import Engine, EngineSettings, RunControl, RunFailed, SkillRef
 from app.engine.validation import validate
 from app.errors import ConflictError, InvalidError
-from app.schemas.workflow import WorkflowDefinition
+from app.schemas.workflow import ValidationResult, WorkflowDefinition
 
 logger = logging.getLogger(__name__)
 
@@ -61,15 +61,28 @@ class RunRegistry:
     def active(self, run_id: int) -> ActiveRun | None:
         return self._active.get(run_id)
 
-    def start(self, workflow_id: int) -> tuple[int, int]:
-        """Prüft und startet einen Workflow. Gibt (run_id, credits_estimate) zurück."""
+    def check(self, definition: WorkflowDefinition) -> ValidationResult:
+        """Prüfung vor dem Start (F4) mit den aktuellen Geräten und Skills."""
+        return validate(
+            definition,
+            devices={d.id: d.kind for d in self.devices.list()},
+            skill_ids={s["id"] for s in repo.list_skills(self.db)},
+            require_skill=self.dream.mode != "mock",
+        )
+
+    def start(self, workflow_id: int | None, definition: WorkflowDefinition | None = None) -> int:
+        """Prüft und startet einen gespeicherten Workflow oder eine Momentaufnahme. Gibt die run_id zurück."""
         if self._active:
             raise ConflictError(f"Lauf {next(iter(self._active))} ist noch aktiv; erst stoppen")
-        definition = WorkflowDefinition.model_validate(repo.get_workflow(self.db, workflow_id)["definition"])
+        if workflow_id is not None:
+            stored = repo.get_workflow(self.db, workflow_id)  # 404, falls unbekannt
+            definition = definition or WorkflowDefinition.model_validate(stored["definition"])
+        if definition is None:
+            raise InvalidError("workflow_id oder definition angeben")
         skills = {
             s["id"]: SkillRef(name=s["name"], checkpoint=s["fine_tuned_model"]) for s in repo.list_skills(self.db)
         }
-        result = validate(definition, devices={d.id: d.kind for d in self.devices.list()}, skill_ids=set(skills))
+        result = self.check(definition)
         if not result.valid:
             raise InvalidError("Workflow ist nicht startbereit", details=result.model_dump(mode="json"))
 
@@ -86,7 +99,7 @@ class RunRegistry:
         )
         state.task = asyncio.create_task(self._execute(run_id, engine), name=f"run-{run_id}")
         self._active[run_id] = state
-        return run_id, result.credits_estimate
+        return run_id
 
     async def stop(self, run_id: int) -> None:
         state = self._require(run_id)

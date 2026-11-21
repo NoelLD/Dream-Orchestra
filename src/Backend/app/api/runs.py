@@ -2,7 +2,7 @@ from fastapi import APIRouter, Query, status
 
 from app.api.deps import Svc
 from app.db import repo
-from app.schemas.models import LogEntry, RunOut, RunStart, RunStarted, RunStatus
+from app.schemas.models import LogEntry, RunOut, RunStart
 
 router = APIRouter(prefix="/runs", tags=["Läufe"])
 
@@ -19,10 +19,16 @@ def _run_out(services: Svc, run_id: int, after: int) -> RunOut:
     )
 
 
-@router.post("", response_model=RunStarted, status_code=status.HTTP_202_ACCEPTED, summary="Ablauf starten (F5, F15)")
-async def start_run(services: Svc, data: RunStart) -> RunStarted:
-    run_id, estimate = services.runs.start(data.workflow_id)
-    return RunStarted(run_id=run_id, status=RunStatus.RUNNING, api_mode=services.dream.mode, credits_estimate=estimate)
+@router.post(
+    "",
+    response_model=RunOut,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Ablauf starten (F5, F15): gespeicherter Workflow oder Momentaufnahme aus dem Editor",
+    responses={422: {"description": "Prüfung vor dem Start fehlgeschlagen; `details` enthält das Prüfergebnis"}},
+)
+async def start_run(services: Svc, data: RunStart) -> RunOut:
+    run_id = services.runs.start(data.workflow_id, data.definition)
+    return _run_out(services, run_id, 0)
 
 
 @router.get("", response_model=list[RunOut], summary="Letzte Läufe (ohne Protokoll)")

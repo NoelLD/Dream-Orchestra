@@ -109,7 +109,7 @@ def update_workflow(db: Database, workflow_id: int, name: str, definition: dict[
 # --- Läufe und Protokoll -----------------------------------------------------
 
 
-def create_run(db: Database, workflow_id: int, api_mode: str, credits_estimate: int) -> int:
+def create_run(db: Database, workflow_id: int | None, api_mode: str, credits_estimate: int) -> int:
     with db.connect() as conn:
         cur = conn.execute(
             "INSERT INTO runs (workflow_id, status, api_mode, started_at, credits_estimate) VALUES (?, ?, ?, ?, ?)",

@@ -5,6 +5,8 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -80,6 +82,15 @@ def create_app(settings: Settings | None = None, factory: Callable[[Settings], S
         if exc.details is not None:
             body["details"] = exc.details
         return JSONResponse(body, status_code=exc.status_code)
+
+    @app.exception_handler(RequestValidationError)
+    async def request_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+        """Gleiches Fehlerformat wie AppError, damit das Frontend nur eine Form lesen muss."""
+        errors = jsonable_encoder(exc.errors())
+        first = errors[0] if errors else {}
+        where = ".".join(str(p) for p in first.get("loc", []) if p != "body")
+        detail = f"{where}: {first.get('msg', 'ungültig')}" if where else str(first.get("msg", "ungültig"))
+        return JSONResponse({"error": "invalid_request", "detail": detail, "details": errors}, status_code=422)
 
     app.include_router(health.root)
     api = APIRouter(prefix="/api")

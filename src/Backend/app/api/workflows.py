@@ -4,7 +4,6 @@ from fastapi import APIRouter, status
 
 from app.api.deps import Svc
 from app.db import repo
-from app.engine.validation import validate
 from app.schemas.workflow import ValidationResult, WorkflowDefinition, WorkflowIn, WorkflowOut, WorkflowSummary
 
 router = APIRouter(prefix="/workflows", tags=["Workflows"])
@@ -24,11 +23,7 @@ def create_workflow(services: Svc, data: WorkflowIn) -> dict[str, Any]:
     "/validate", response_model=ValidationResult, summary="Prüfung vor dem Start (F4) + Credit-Schätzung (F15)"
 )
 def validate_workflow(services: Svc, definition: WorkflowDefinition) -> ValidationResult:
-    return validate(
-        definition,
-        devices={d.id: d.kind for d in services.devices.list()},
-        skill_ids={s["id"] for s in repo.list_skills(services.db)},
-    )
+    return services.runs.check(definition)
 
 
 @router.get("/{workflow_id}", response_model=WorkflowOut, summary="Laden (F3)")

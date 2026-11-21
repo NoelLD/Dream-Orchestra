@@ -5,10 +5,52 @@ services:
     build:
       context: .
       dockerfile: src/Frontend/Dockerfile
+      target: prod
+      args:
+        VITE_API_MODE: ${VITE_API_MODE_PROD:-real}
     ports:
       - "127.0.0.1:8080:80"
+
+  frontend-dev:
+    profiles: [dev]
+    build:
+      context: .
+      dockerfile: src/Frontend/Dockerfile
+      target: dev
+    init: true
+    ports:
+      - "127.0.0.1:5173:5173"
+    environment:
+      VITE_API_MODE: ${VITE_API_MODE:-mock}
+      DEV_POLLING: ${DEV_POLLING:-true}
     volumes:
-      - ./src/Frontend:/app:ro
+      - ./src/Frontend:/app
+      - frontend_node_modules:/app/node_modules
+
+  playwright:
+    profiles: [dev]
+    image: mcr.microsoft.com/playwright/mcp:v0.0.86
+    init: true
+    entrypoint: node
+    command: ["/app/cli.js", "--headless", "--browser", "chromium", "--no-sandbox", "--port", "8931", "--host", "0.0.0.0"]
+    ports:
+      - "127.0.0.1:8931:8931"
+
+  # E2E-Tests und Screenshots: docker compose --profile dev --profile e2e run --rm e2e
+  e2e:
+    profiles: [e2e]
+    image: mcr.microsoft.com/playwright:v1.65.1-noble
+    init: true
+    ipc: host
+    working_dir: /app
+    environment:
+      E2E_BASE_URL: ${E2E_BASE_URL:-http://frontend-dev:5173}
+    volumes:
+      - ./src/Frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      - frontend-dev
+    command: ["npx", "--no-install", "playwright", "test"]
 
   backend:
     build:
@@ -72,3 +114,6 @@ services:
       - ./src/Database:/app:ro
       - ./src/Backend/models:/schema:ro
       - ./src/Backend/data:/data
+
+volumes:
+  frontend_node_modules:

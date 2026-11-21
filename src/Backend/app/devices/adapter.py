@@ -35,6 +35,9 @@ class Device:
     type: DeviceType
     value: bool | float
     adapter: str = "virtual"
+    unit: str | None = None
+    min: float | None = None
+    max: float | None = None
 
     @property
     def kind(self) -> DeviceKind:
@@ -49,12 +52,14 @@ class DeviceAdapter(Protocol):
     def set(self, device_id: str, value: bool | float) -> Device: ...
 
 
+# Gleiche Geräte wie im Frontend-Mock (src/Frontend/src/api/mockClient.ts) und im Beispiel-Workflow.
 DEFAULT_DEVICES = (
     Device("lichtschranke", "Lichtschranke", DeviceType.SWITCH, False),
-    Device("schalter", "Schalter", DeviceType.SWITCH, False),
-    Device("taster", "Taster", DeviceType.BUTTON, False),
-    Device("pruefwert", "Prüfwert", DeviceType.NUMBER, 0.0),
-    Device("lampe", "Lampe", DeviceType.LAMP, False),
+    Device("taster", "Taster „Start“", DeviceType.BUTTON, False),
+    Device("weitere-objekte", "Weitere Objekte", DeviceType.SWITCH, True),
+    Device("fuellstand", "Füllstand Kiste", DeviceType.NUMBER, 0.0, unit="Stk", min=0, max=10),
+    Device("lampe", "Signallampe grün", DeviceType.LAMP, False),
+    Device("lampe-rot", "Signallampe rot", DeviceType.LAMP, False),
     Device("foerderband", "Förderband", DeviceType.CONVEYOR, False),
 )
 

@@ -83,7 +83,7 @@ async def test_condition_both_paths(switch: bool, expected: str) -> None:
     definition = wf(
         [
             ("s", "start", {}),
-            ("c", "condition", {"device": "schalter", "value": True}),
+            ("c", "condition", {"device": "weitere-objekte", "value": True}),
             ("yes", "set_actuator", {"device": "lampe", "value": True}),
             ("no", "set_actuator", {"device": "foerderband", "value": True}),
             ("e", "end", {}),
@@ -91,7 +91,7 @@ async def test_condition_both_paths(switch: bool, expected: str) -> None:
         [("s", "c", "next"), ("c", "yes", "true"), ("c", "no", "false"), ("yes", "e", "next"), ("no", "e", "next")],
     )
     devices = VirtualAdapter()
-    devices.set("schalter", switch)
+    devices.set("weitere-objekte", switch)
     engine, sink, _, _ = make(definition, devices=devices)
     await engine.run()
     assert expected in sink.blocks
@@ -99,18 +99,18 @@ async def test_condition_both_paths(switch: bool, expected: str) -> None:
 
 
 async def test_loop_ends_when_sensor_changes() -> None:
-    # Pick-and-Place: solange „schalter“ an ist, nächstes Objekt greifen.
+    # Pick-and-Place: solange „weitere-objekte“ an ist, nächstes Objekt greifen.
     definition = wf(
         [
             ("s", "start", {}),
             ("p", "prompt", prompt()),
-            ("c", "condition", {"device": "schalter", "value": True}),
+            ("c", "condition", {"device": "weitere-objekte", "value": True}),
             ("e", "end", {}),
         ],
         [("s", "p", "next"), ("p", "c", "next"), ("c", "p", "true"), ("c", "e", "false")],
     )
     devices = VirtualAdapter()
-    devices.set("schalter", True)
+    devices.set("weitere-objekte", True)
     engine, sink, _, _ = make(definition, devices=devices)
     third_grab = asyncio.Event()
     record = sink.block_entered
@@ -123,7 +123,7 @@ async def test_loop_ends_when_sensor_changes() -> None:
     sink.block_entered = watch  # type: ignore[method-assign]
     task = asyncio.create_task(engine.run())
     await asyncio.wait_for(third_grab.wait(), 2)
-    devices.set("schalter", False)
+    devices.set("weitere-objekte", False)
     await asyncio.wait_for(task, 2)
     assert sink.blocks[-1] == "e"
     assert sink.blocks.count("p") >= 3
@@ -250,3 +250,30 @@ def test_validation_rules() -> None:
     assert ("c", "Ausgang 'false' ist nicht verbunden") in messages
     assert ("c", "Gerät 'lampe' ist kein sensor") in messages
     assert result.credits_estimate == 1
+
+
+def test_skill_required_outside_mock_mode() -> None:
+    devices = {d.id: d.kind for d in VirtualAdapter().list()}
+    base = wf(
+        [("s", "start", {}), ("p", "prompt", {"skill_id": None, "prompt": "pick up"}), ("e", "end", {})],
+        [("s", "p", "next"), ("p", "e", "next")],
+    )
+    assert validate(base, devices=devices, skill_ids=set()).valid
+    result = validate(base, devices=devices, skill_ids=set(), require_skill=True)
+    assert [(i.block_id, i.message[:16]) for i in result.errors] == [("p", "Kein Skill gewäh")]
+
+
+async def test_wait_sensor_without_timeout_waits_until_stopped() -> None:
+    definition = wf(
+        [("s", "start", {}), ("w", "wait_sensor", {"device": "lichtschranke", "value": True}), ("e", "end", {})],
+        [("s", "w", "next"), ("w", "e", "next")],
+    )
+    engine, _, _, _ = make(
+        definition, settings=EngineSettings(sensor_poll_interval_s=0.01, default_block_timeout_s=0.05)
+    )
+    task = asyncio.create_task(engine.run())
+    await asyncio.sleep(0.2)  # länger als default_block_timeout_s: ohne eigenes Limit kein Fehler
+    assert not task.done()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task

@@ -45,6 +45,9 @@ class SkillRef:
     checkpoint: str | None
 
 
+BASE_MODEL = SkillRef(name="dream-1-base", checkpoint=None)  # Prompt-Block ohne Skill
+
+
 class RunSink(Protocol):
     """Empfängt Fortschritt und Protokoll eines Laufs."""
 
@@ -207,8 +210,11 @@ class Engine:
         return Port.NEXT  # Start
 
     async def _prompt(self, block: Block, params: PromptParams) -> Port:
-        skill = self.skills.get(params.skill_id)
-        if skill is None:
+        if params.skill_id is None:
+            skill = BASE_MODEL
+        elif (found := self.skills.get(params.skill_id)) is not None:
+            skill = found
+        else:
             raise BlockError(f"Skill {params.skill_id} existiert nicht")
         checkpoint = params.checkpoint or skill.checkpoint
         timeout = params.timeout_s or self.settings.default_block_timeout_s
@@ -259,10 +265,10 @@ class Engine:
             raise
 
     async def _wait_sensor(self, block: Block, params: WaitSensorParams) -> Port:
-        timeout = params.timeout_s or self.settings.default_block_timeout_s
+        timeout = params.timeout_s  # None = ohne Zeitlimit (F12); Stopp bleibt jederzeit möglich
         started = time.monotonic()
         while not holds(self.devices.get(params.device).value, params.operator, params.value):
-            if time.monotonic() - started >= timeout:
+            if timeout is not None and time.monotonic() - started >= timeout:
                 raise BlockError(
                     f"Zeitlimit {timeout:g} s: {params.device} {params.operator} {fmt(params.value)} nicht erfüllt"
                 )

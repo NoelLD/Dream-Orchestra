@@ -25,6 +25,7 @@ def validate(
     *,
     devices: Mapping[str, DeviceKind],
     skill_ids: set[int],
+    require_skill: bool = False,
 ) -> ValidationResult:
     errors: list[Issue] = []
 
@@ -62,7 +63,7 @@ def validate(
         for port_name, targets in outgoing[block.id].items():
             if len(targets) > 1:
                 error(f"Ausgang '{port_name}' hat mehrere Pfeile", block.id)
-        _check_params(block.type, block.params, block.id, devices, skill_ids, error)
+        _check_params(block.type, block.params, block.id, devices, skill_ids, require_skill, error)
 
     # Keine losen Blöcke: alles muss vom Start aus erreichbar sein.
     seen, stack = set(starts), list(starts)
@@ -84,6 +85,7 @@ def _check_params(
     block_id: str,
     devices: Mapping[str, DeviceKind],
     skill_ids: set[int],
+    require_skill: bool,
     error: Callable[[str, str | None], None],
 ) -> None:
     try:
@@ -97,7 +99,10 @@ def _check_params(
     if isinstance(parsed, PromptParams):
         if not parsed.prompt.strip():
             error("Leerer Prompt", block_id)
-        if parsed.skill_id not in skill_ids:
+        if parsed.skill_id is None:
+            if require_skill:
+                error("Kein Skill gewählt (der Simulationsdienst misst den Erfolg je Skill)", block_id)
+        elif parsed.skill_id not in skill_ids:
             error(f"Skill {parsed.skill_id} existiert nicht", block_id)
     elif isinstance(parsed, ConditionParams | SetActuatorParams):
         expected = DeviceKind.ACTUATOR if isinstance(parsed, SetActuatorParams) else DeviceKind.SENSOR

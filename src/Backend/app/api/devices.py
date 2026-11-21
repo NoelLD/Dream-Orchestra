@@ -9,7 +9,15 @@ router = APIRouter(prefix="/devices", tags=["Geräte"])
 
 def _out(device: Device) -> DeviceOut:
     return DeviceOut(
-        id=device.id, name=device.name, type=device.type, kind=device.kind, adapter=device.adapter, value=device.value
+        id=device.id,
+        name=device.name,
+        type=device.type,
+        kind=device.kind,
+        adapter=device.adapter,
+        value=device.value,
+        unit=device.unit,
+        min=device.min,
+        max=device.max,
     )
 
 

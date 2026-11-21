@@ -41,6 +41,7 @@ class Block(BaseModel):
 
 
 class Edge(BaseModel):
+    id: str | None = Field(default=None, description="Nur für den Editor")
     source: str
     target: str
     port: Port = Port.NEXT
@@ -76,7 +77,7 @@ class WorkflowDefinition(BaseModel):
 
 
 class PromptParams(BaseModel):
-    skill_id: int
+    skill_id: int | None = Field(default=None, description="None = Dream-1-Basismodell (nur im Modus mock)")
     prompt: str = Field(min_length=1)
     checkpoint: str | None = Field(default=None, description="Sonst fine_tuned_model des Skills bzw. Basismodell")
     timeout_s: float | None = Field(default=None, gt=0, description="Harte Wanduhr-Grenze pro Versuch (F6)")
@@ -96,7 +97,7 @@ class ConditionParams(BaseModel):
 
 
 class WaitSensorParams(ConditionParams):
-    timeout_s: float | None = Field(default=None, gt=0, description="Eigenes Zeitlimit (F12)")
+    timeout_s: float | None = Field(default=None, gt=0, description="Eigenes Zeitlimit (F12); None = ohne Zeitlimit")
 
 
 class SetActuatorParams(BaseModel):

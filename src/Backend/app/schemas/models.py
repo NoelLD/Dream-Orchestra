@@ -3,9 +3,10 @@
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.devices.adapter import DeviceKind, DeviceType
+from app.schemas.workflow import WorkflowDefinition
 
 
 class SkillStatus(StrEnum):
@@ -17,7 +18,7 @@ class SkillStatus(StrEnum):
 
 class SkillIn(BaseModel):
     name: str = Field(min_length=1, max_length=100, description="Im Modus sim/real: Skill-Name des Simulationsdienstes")
-    description: str = Field(min_length=1)
+    description: str = ""
     status: SkillStatus = SkillStatus.DRAFT
     fine_tuned_model: str | None = None
 
@@ -36,14 +37,16 @@ class RunStatus(StrEnum):
 
 
 class RunStart(BaseModel):
-    workflow_id: int
+    """Gespeicherten Workflow starten oder eine Momentaufnahme aus dem Editor (dann optional mit Zuordnung)."""
 
+    workflow_id: int | None = None
+    definition: WorkflowDefinition | None = Field(default=None, description="Momentaufnahme; sonst gespeicherte")
 
-class RunStarted(BaseModel):
-    run_id: int
-    status: RunStatus
-    api_mode: str
-    credits_estimate: int
+    @model_validator(mode="after")
+    def _needs_source(self) -> "RunStart":
+        if self.workflow_id is None and self.definition is None:
+            raise ValueError("workflow_id oder definition angeben")
+        return self
 
 
 class LogEntry(BaseModel):
@@ -78,6 +81,9 @@ class DeviceOut(BaseModel):
     kind: DeviceKind
     adapter: str
     value: bool | float
+    unit: str | None = None
+    min: float | None = None
+    max: float | None = None
 
 
 class DeviceValue(BaseModel):

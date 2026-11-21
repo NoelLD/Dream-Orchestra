@@ -32,3 +32,23 @@ def update_skill(services: Svc, skill_id: int, data: SkillIn) -> dict[str, Any]:
 @router.delete("/{skill_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_skill(services: Svc, skill_id: int) -> None:
     repo.delete_skill(services.db, skill_id)
+
+
+@router.post(
+    "/import-simulation",
+    response_model=list[SkillOut],
+    summary="Skills des Simulationsdienstes übernehmen (fehlende anlegen; vorhandene bleiben unverändert)",
+)
+async def import_simulation_skills(services: Svc) -> list[dict[str, Any]]:
+    existing = {s["name"] for s in repo.list_skills(services.db)}
+    for sim_skill in await services.simulation.request("GET", "/skills"):
+        if sim_skill["name"] not in existing:
+            repo.create_skill(
+                services.db,
+                SkillIn(
+                    name=sim_skill["name"],
+                    description=sim_skill.get("description") or "",
+                    fine_tuned_model=sim_skill.get("fine_tuned_model"),
+                ).model_dump(),
+            )
+    return repo.list_skills(services.db)
