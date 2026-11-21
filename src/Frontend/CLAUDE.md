@@ -18,7 +18,7 @@ src/workflow/   blocks.ts, store.ts (Editor + Laufzustand), flow.ts (Editor <-> 
                 validate.ts (F4), estimate.ts (F15), sample.ts (Beispiel + leerer Workflow),
                 components/ (Canvas, BlockNode, SmartEdge, Palette, Toolbar, PropertiesPanel, WorkflowsDialog)
 src/run/        useRun.ts (Polling, Start/Stopp/Pause), RunLog.tsx, labels.ts
-src/devices/    DeviceBar.tsx
+src/devices/    DeviceBar.tsx (nur Geräte des Workflows), DevicesView.tsx (Verwaltung), deviceForm.ts, workflowDevices.ts
 src/skills/     SkillsView.tsx
 src/components/ AppHeader.tsx (STOPP, Mock-Banner), ui/ (shadcn – generiert)
 e2e/            Playwright-Specs; Screenshots landen in e2e/screenshots/ (gitignored)

@@ -30,6 +30,16 @@ docker compose --profile dev up -d --build    # alles inkl. Dev-Server
 4. **Weitere Objekte** ausschalten. Der Lauf endet mit „erfolgreich“, das Protokoll zeigt jeden Schritt.
 5. Der rote **STOPP**-Knopf oben rechts bricht jederzeit ab.
 
+## Geräte (Sensoren und Aktoren)
+
+- Tab **Geräte**: Geräte anlegen, bearbeiten, löschen – Name, Typ (Sensor: Schalter, Taster, Zahlenwert; Aktor: Lampe,
+  Förderband) und Protokoll **virtuell**, **MQTT** (Broker, Port, Topic, QoS, TLS) oder **OPC UA** (Endpoint, Node-ID,
+  Sicherheitsmodus). Passwörter werden gespeichert, aber nie angezeigt.
+- Werte werden vorerst **simuliert**; eine echte Verbindung zu Broker oder OPC-UA-Server gibt es noch nicht.
+- Die **Geräteleiste** unten rechts zeigt nur Geräte, die in einem Block des offenen Workflows gewählt sind. Sensoren
+  sind bedienbar, Aktoren schaltet der Ablauf.
+- Löschen ist gesperrt, solange ein gespeicherter Workflow das Gerät verwendet.
+
 ## Prüfen
 
 ```sh
