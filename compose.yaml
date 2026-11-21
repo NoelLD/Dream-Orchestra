@@ -17,21 +17,51 @@ services:
     init: true
     ports:
       - "127.0.0.1:8000:8000"
+    # Dev-Start mit Reload; Polling, weil das Repo im Windows-Dateisystem liegen kann.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "app"]
+    environment:
+      WATCHFILES_FORCE_POLLING: "true"
+      # mock (Standard) | sim | real; überschreibbar: DREAM_API_MODE=sim docker compose up backend
+      DREAM_API_MODE: ${DREAM_API_MODE:-mock}
     volumes:
       - ./src/Backend:/app:ro
+      - ./src/Backend/data:/app/data
     env_file:
       - path: .env
         required: false
 
+  # MuJoCo YAM scene + Dream-1 control loop + FastAPI (API contract: src/Simulation/README.md, docs at /docs).
   simulation:
     build:
       context: .
       dockerfile: src/Simulation/Dockerfile
+    image: dreamorchestra-simulation:local
     init: true
+    working_dir: /data
     ports:
       - "127.0.0.1:3001:3001"
     volumes:
       - ./src/Simulation:/app:ro
+      - ./src/Simulation/data:/data
+    env_file:
+      - path: .env
+        required: false
+
+  # Optional: live MuJoCo window in the browser (noVNC), http://localhost:6080/vnc.html?autoconnect=1&resize=scale
+  simulation-gui:
+    image: dreamorchestra-simulation:local
+    profiles: ["gui"]
+    init: true
+    working_dir: /data
+    environment:
+      MUJOCO_GL: glfw
+      LIBGL_ALWAYS_SOFTWARE: "1"
+    ports:
+      - "127.0.0.1:6080:6080"
+    volumes:
+      - ./src/Simulation:/app:ro
+      - ./src/Simulation/data:/data
+    command: ["bash", "/app/tools/gui.sh", "python", "/app/tools/view_pickup.py"]
 
   database:
     build:

@@ -1,4 +1,43 @@
+# Secrets (nur .env.template wird geteilt)
 /.env
 /.env.*
 !/.env.template
+
+# Python
 __pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / Frontend-Build
+node_modules/
+dist/
+
+# Laufzeitdaten (Ordner mit eigener .gitignore: src/Backend/data, src/Simulation/data)
+*.sqlite3
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
+*.log
+
+# Vendored Abhängigkeiten
+/vendor/
+
+# Editor, Backups, Betriebssystem
+.idea/
+*.swp
+*~
+*.bak
+*.orig
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Lokale Claude-Code-Einstellungen
+.claude/settings.local.json

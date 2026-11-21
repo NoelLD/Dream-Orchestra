@@ -1,0 +1,93 @@
+"""Pydantic-Modelle für Skills, Läufe, Geräte und Status."""
+
+from datetime import datetime
+from enum import StrEnum
+
+from pydantic import BaseModel, Field
+
+from app.devices.adapter import DeviceKind, DeviceType
+
+
+class SkillStatus(StrEnum):
+    DRAFT = "Entwurf"
+    TRAINING = "Training"
+    READY = "Bereit"
+    ERROR = "Fehler"
+
+
+class SkillIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100, description="Im Modus sim/real: Skill-Name des Simulationsdienstes")
+    description: str = Field(min_length=1)
+    status: SkillStatus = SkillStatus.DRAFT
+    fine_tuned_model: str | None = None
+
+
+class SkillOut(SkillIn):
+    id: int
+    created_at: datetime
+
+
+class RunStatus(StrEnum):
+    RUNNING = "running"
+    PAUSED = "paused"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    STOPPED = "stopped"
+
+
+class RunStart(BaseModel):
+    workflow_id: int
+
+
+class RunStarted(BaseModel):
+    run_id: int
+    status: RunStatus
+    api_mode: str
+    credits_estimate: int
+
+
+class LogEntry(BaseModel):
+    id: int
+    timestamp: datetime
+    level: str
+    block_id: str | None
+    api_status: str | None
+    duration_ms: float | None
+    message: str
+
+
+class RunOut(BaseModel):
+    id: int
+    workflow_id: int | None
+    status: RunStatus
+    api_mode: str
+    active_block_id: str | None = Field(description="F5: aktuell ausgeführter Block, nur während des Laufs")
+    started_at: datetime
+    finished_at: datetime | None
+    credits_estimate: int
+    credits_used: int
+    error: str | None
+    log: list[LogEntry] = Field(description="Einträge mit id > after")
+    cursor: int = Field(description="Für die nächste Abfrage als ?after= übergeben")
+
+
+class DeviceOut(BaseModel):
+    id: str
+    name: str
+    type: DeviceType
+    kind: DeviceKind
+    adapter: str
+    value: bool | float
+
+
+class DeviceValue(BaseModel):
+    value: bool | float
+
+
+class StatusOut(BaseModel):
+    version: str
+    api_mode: str = Field(description="mock | sim | real")
+    banner: str = Field(description="„SIMULIERTE API“ oder „ECHTE API“ (N2)")
+    dream_api_key_set: bool = Field(description="Nur ob, nie welcher (N1)")
+    simulation_reachable: bool | None = Field(description="None im Modus mock")
+    problems: list[str]
