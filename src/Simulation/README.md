@@ -1,7 +1,8 @@
 # Simulation-Dienst (`simulation`)
 
-> **API v0.2 (21.11.2026).** Umgesetzt und getestet im Modus `mock` (10 pytest-Tests grün). Der Modus `dream` ist
-> implementiert, aber **noch nicht mit einem echten Dream-1-Aufruf getestet**. Das kostet Credits und folgt nach Freigabe.
+> **API v0.2 (21.11.2026).** Beide Modi laufen. `mock`: 10 pytest-Tests grün. `dream`: am 21.11. gegen die echte API
+> geprüft. `pick-banana` mit `dreamlabs/dream-1-beta` zero-shot `succeeded` (Banane 8,3 cm angehoben, 7 Aufrufe,
+> 34 s, ~0,01 $). Ein erster Lauf davor endete mit `timeout`. Einzelläufe sind keine Erfolgsquote.
 > Live-Doku der laufenden API: http://localhost:3001/docs
 
 Einer von vier Compose-Diensten des Dream Orchestrators (`frontend`, `backend`, `simulation`, `database`):
@@ -99,7 +100,7 @@ Jeder Eintrag hat `name`, `description`, `default_prompt`, `fine_tuned_model`, `
 | `prompt` | string | nein | Text für Dream-1. Fehlt er, gilt der Standard-Prompt. Ein leerer String gibt `400` (F4) |
 | `checkpoint` | string | nein | `dreamlabs/dream-1-beta` (Standard), `dreamlabs/dream-1-beta-flash` oder ein Fine-Tune `dream-1-ft:<uid8>-<suffix>` |
 | `mode` | `"dream"` \| `"mock"` | nein | `dream` (Standard) = echte API, kostet Credits. `mock` = geskripteter Greifablauf ohne API (N2). Die Oberfläche zeigt bei `mock` "SIMULIERTE API" an |
-| `timeout_s` | 5–600 | nein | Standard 60 s (`dream`) bzw. 300 s (`mock`, das Software-Rendering ist langsamer als Echtzeit) |
+| `timeout_s` | 5–600 | nein | **Simulierte** Sekunden, Standard 60. Bei `dream` zählt die Zeit ab der ersten Modellantwort. Zusätzlich gilt eine harte Wanduhr-Grenze von 10 × `timeout_s` |
 | `seed` | int | nein | Verschiebt Banane und Apfel reproduzierbar um bis zu ±3 cm. Fehlt er, wird gelost |
 | `record_video` | bool | nein | MP4 aufzeichnen (Standard `true`) |
 
@@ -110,11 +111,11 @@ Antwort `202`: `{"run_id": "run_7f3a9c12", "status": "queued", "mode": "mock"}`.
 ```json
 {
   "run_id": "run_7f3a9c12", "skill": "pick-banana", "mode": "mock", "prompt": "pick up the banana",
-  "checkpoint": null, "seed": 1, "timeout_s": 300,
+  "checkpoint": null, "seed": 1, "timeout_s": 60,
   "status": "succeeded", "success": true,
   "success_detail": { "lift_m": 0.145, "tcp_distance_m": 0.026, "release_drop_m": 0.154 },
   "created_at": "2026-11-21T19:40:02Z", "started_at": "2026-11-21T19:40:02Z", "finished_at": "2026-11-21T19:41:55Z",
-  "duration_s": 112.6, "api_calls": 0, "cost_usd": 0.0, "cost_is_estimate": true,
+  "duration_s": 30.2, "api_calls": 0, "cost_usd": 0.0, "cost_is_estimate": true,
   "error": null, "video_url": "/runs/run_7f3a9c12/video"
 }
 ```
@@ -142,8 +143,8 @@ Antwort `200`, Status zuerst `stopping`, dann `stopped`. Im Modus `dream` greift
 
 ### `GET /runs/{run_id}/video` und `GET /frame.jpg`
 
-- `video`: `video/mp4` mit 10 fps, Draufsicht oben, beide Handgelenkkameras unten. `404`, solange der Lauf nicht terminal ist.
-- `frame.jpg`: neueste Draufsicht (640×360) des laufenden oder letzten Laufs, sonst die Startszene. Für eine Live-Kachel reicht Polling alle 200–500 ms.
+- `video`: `video/mp4` mit 5 fps, 320×270 (Draufsicht oben, beide Handgelenkkameras unten). Es sind dieselben Bilder, die Dream-1 sieht. `404`, solange der Lauf nicht terminal ist.
+- `frame.jpg`: neueste Draufsicht (320×180) des laufenden oder letzten Laufs, sonst die Startszene (640×360). Für eine Live-Kachel reicht Polling alle 200–500 ms.
 
 ### Datasets und Fine-Tuning
 
@@ -192,14 +193,15 @@ Im Container mit `docker compose run --rm simulation python /app/tools/<script> 
 | `DREAM_API_KEY` | – | Aus `.env`, nur im Container |
 | `MUJOCO_GL` | `egl` | `osmesa` als Ausweichlösung |
 | `SIM_DATA_DIR` | `/data` | Läufe, Videos, Datasets |
-| `SIM_DEFAULT_TIMEOUT_S` / `SIM_DEFAULT_MOCK_TIMEOUT_S` | `60` / `300` | Standard-Zeitlimits |
+| `SIM_DEFAULT_TIMEOUT_S` / `SIM_DEFAULT_MOCK_TIMEOUT_S` | `60` / `60` | Standard-Zeitlimits (simulierte Sekunden) |
+| `SIM_RENDER_SHADOWS` | `0` | `1` = Schatten und Spiegelungen in Läufen (wie in den Trainingsdaten), etwa 3× langsamer bei Software-Rendering |
 | `SIM_MIN_CALL_INTERVAL_S` | `0.7` | Mindestabstand zwischen API-Aufrufen (Ratenlimit: 3 schnelle, danach 1 pro 0,7 s; N5) |
 | `DREAM_YAM_EXAMPLE` | im Image gepinnt | Pfad zum Dream-Beispiel `yam_mujoco` |
 
 ## Bekannte Grenzen
 
-- Der Modus `dream` ist noch nicht mit einem echten Aufruf verifiziert (siehe oben).
-- Die Simulation rendert per Software: Ein Mock-Lauf dauert etwa 2 min, Dream-Läufe sind auf 20 Hz getaktet.
+- Die Simulation rendert per Software (Mesa, 2 CPUs in Colima): ~200 ms für drei 320×180-Bilder ohne Schatten. Ein Dream-Lauf läuft dadurch etwa 1–2× langsamer als Echtzeit. Mehr CPUs für Docker oder Colima beschleunigen das.
+- Läufe rendern standardmäßig ohne Schatten. Die Trainingsdaten (`pick-v1`) wurden mit Schatten in 640×360 aufgenommen. Für einen fairen Vergleich mit einem Fine-Tune `SIM_RENDER_SHADOWS=1` setzen.
 - Datasets haben 10 fps, weil Dream Labs nur 30, 15, 10 oder 5 fps annimmt und die Simulation mit 20 Hz steuert.
 - Der geskriptete Ablauf greift nur Banane und Apfel. Bei der Orange findet die IK keine Lösung.
 - Erfolgsquoten gelten nur in der Simulation. Laut Dream Labs lehrt Fine-Tuning vor allem den Roboterkörper, nicht eine Aufgabe. Ob ein Fine-Tune auf YAM die Quote verbessert, wird gemessen und nicht vorausgesetzt.

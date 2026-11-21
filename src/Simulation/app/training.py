@@ -35,6 +35,8 @@ class TrainingState:
         for record in self.datasets.values():  # a generation the service did not survive cannot finish
             if record.get("status") in ("generating", "uploading"):
                 record["status"], record["error"] = "failed", "interrupted by a service restart"
+            elif record.get("status") == "processing" and record.get("dream_dataset_id"):
+                threading.Thread(target=self._poll, args=(record,), daemon=True).start()  # resume after restart
 
     def save(self) -> None:
         with self.lock:
@@ -104,15 +106,28 @@ class TrainingState:
             record.update(dream_dataset_id=uploaded.id, dream_dataset_name=uploaded.name,
                           dream_status=uploaded.status, status="processing")
             self.save()
-            while record["dream_status"] not in ("processed", "failed"):
-                time.sleep(20)
-                current = datasets.get_dataset(uploaded.id)
+        except Exception as error:
+            log.exception("upload of %s failed", record["name"])
+            record.update(status="failed", error=f"{type(error).__name__}: {str(error)[:300]}")
+            self.save()
+            return
+        self._poll(record)
+
+    def _poll(self, record: dict) -> None:
+        """Follow a dataset at Dream Labs until processed or failed."""
+        from dream import datasets
+
+        try:
+            while record.get("dream_status") not in ("processed", "failed"):
+                current = datasets.get_dataset(record["dream_dataset_id"])
                 record["dream_status"] = current.status
                 if current.status == "failed":
                     record["error"] = getattr(current, "error", None)
+                if record["dream_status"] not in ("processed", "failed"):
+                    time.sleep(20)
             record["status"] = "processed" if record["dream_status"] == "processed" else "failed"
         except Exception as error:
-            log.exception("upload of %s failed", record["name"])
+            log.exception("status poll of %s failed", record["name"])
             record.update(status="failed", error=f"{type(error).__name__}: {str(error)[:300]}")
         self.save()
 

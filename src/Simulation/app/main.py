@@ -51,7 +51,7 @@ class RunRequest(BaseModel):
     prompt: str | None = None
     checkpoint: str = config.DEFAULT_CHECKPOINT
     mode: Literal["dream", "mock"] = "dream"
-    timeout_s: float | None = Field(None, ge=5, le=600)  # None: 60 s (dream), 300 s (mock, software-rendered)
+    timeout_s: float | None = Field(None, ge=5, le=600)  # simulated seconds; None: 60
     seed: int | None = None
     record_video: bool = True
 

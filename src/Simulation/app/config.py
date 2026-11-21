@@ -17,8 +17,9 @@ DATASETS_DIR = DATA_DIR / "datasets"
 WORK_DIR = DATA_DIR / "work"  # cwd for the example's scripts, which write relative files (mock_results/)
 
 DEFAULT_TIMEOUT_S = float(os.environ.get("SIM_DEFAULT_TIMEOUT_S", "60"))
-DEFAULT_MOCK_TIMEOUT_S = float(os.environ.get("SIM_DEFAULT_MOCK_TIMEOUT_S", "300"))
+DEFAULT_MOCK_TIMEOUT_S = float(os.environ.get("SIM_DEFAULT_MOCK_TIMEOUT_S", "60"))  # simulated seconds
 MIN_CALL_INTERVAL_S = float(os.environ.get("SIM_MIN_CALL_INTERVAL_S", "0.7"))
+RENDER_SHADOWS = os.environ.get("SIM_RENDER_SHADOWS", "0") == "1"  # off: ~3x faster software rendering
 
 # Price per get_action call (Dream Labs fine-tuning tutorial, 21.11.2026; to be checked against billing).
 PRICE_PER_CALL_USD = {"base": 0.0014, "fine_tuned": 0.0028}

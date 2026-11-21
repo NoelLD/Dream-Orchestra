@@ -27,8 +27,13 @@ log = logging.getLogger("simulation.runner")
 
 TERMINAL = {"succeeded", "failed", "timeout", "stopped", "error"}
 JITTER_M = 0.03
-VIDEO_FPS = 10
-RECORD_EVERY = 2  # sim steps are 50 ms -> 10 fps video
+VIDEO_FPS = 5
+RECORD_EVERY = 4  # sim steps are 50 ms -> 5 fps video; the same frames feed Dream-1 (rendered once)
+SIM_STEP_S = 0.05
+RENDER_W, RENDER_H = 320, 240
+RENDER_CROP = slice(30, 210)  # 320x180, the station crop of the 640x480 render at half size
+WALL_FACTOR = 10  # hard wall-clock cap: 10x timeout_s (software rendering is slower than real time)
+WARMING_CAP_S = 3600  # a fine-tune may take up to 1 h to start
 
 
 class RunInterrupted(Exception):
@@ -248,13 +253,46 @@ class RunManager:
             def __init__(self):
                 super().__init__()
                 self.steps = 0
+                self._small = None
+                self._cached_step, self._cached = -1, None
                 jitter_scene(self, run.seed)
                 tracker_box[0] = SuccessTracker(run.skill, self)
+
+            @property
+            def sim_seconds(self) -> float:
+                return self.steps * SIM_STEP_S
+
+            def images(self):
+                """320x180 renders (the model sees 320x176 anyway), at most once per sim step: ~4x cheaper."""
+                if self._cached_step == self.steps:
+                    return self._cached
+                import mujoco
+
+                if self._small is None:
+                    self._small = mujoco.Renderer(self.model, height=RENDER_H, width=RENDER_W)
+                    # Shadows on the detailed meshes cost ~3x under software rendering (642 vs 207 ms per 3 views).
+                    self._small.scene.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = config.RENDER_SHADOWS
+                    self._small.scene.flags[mujoco.mjtRndFlag.mjRND_REFLECTION] = config.RENDER_SHADOWS
+                images = {}
+                for name in ("top", "left", "right"):
+                    self._small.update_scene(self.data, camera=name)
+                    images[name] = self._small.render()[RENDER_CROP].copy()  # same crop as the station
+                self._cached_step, self._cached = self.steps, images
+                return images
+
+            def close(self):
+                if self._small is not None:
+                    self._small.close()
+                    self._small = None
+                super().close()
 
             def step(self, left, right):
                 if run.stop_event.is_set():
                     raise RunInterrupted("stopped")
-                if deadline_box[0] is not None and time.monotonic() > deadline_box[0]:
+                sim_deadline, wall_deadline = deadline_box
+                if sim_deadline is not None and self.sim_seconds > sim_deadline:
+                    raise RunInterrupted("timeout")
+                if time.monotonic() > wall_deadline:
                     raise RunInterrupted("timeout")
                 state = super().step(left, right)
                 self.steps += 1
@@ -270,7 +308,8 @@ class RunManager:
 
         if not run.skill.mock_available:
             raise ValueError(f"skill {run.skill.name} has no scripted (mock) version")
-        tracker_box, deadline_box = [None, False], [started + run.timeout_s]
+        tracker_box = [None, False]
+        deadline_box = [run.timeout_s, started + WALL_FACTOR * run.timeout_s]
         run.status = "running"
         mock_pickups.YamEnv = self._env_class(run, recorder, tracker_box, deadline_box)
         result = mock_pickups.run_trial(run.skill.obj, yaw=run.skill.mock_yaw)
@@ -285,7 +324,8 @@ class RunManager:
         if not key:
             raise RuntimeError("DREAM_API_KEY is not set")
         gateway = os.environ.get("DREAM_GATEWAY_URL", "https://api.dreamlabs.ai")
-        tracker_box, deadline_box = [None, False], [None]
+        tracker_box = [None, False]
+        deadline_box = [None, time.monotonic() + WARMING_CAP_S]  # sim deadline set once the model answers
         env = self._env_class(run, recorder, tracker_box, deadline_box)()
         policy = None
         try:
@@ -301,9 +341,8 @@ class RunManager:
 
             while any(len(w) < dc.FRAMES for w in windows.values()):  # fill the 9-frame windows, arms holding
                 state = env.state()
-                keep = env.steps % dc.FRAME_EVERY_STEPS == 0
                 env.step(state["left"], state["right"])
-                capture(keep)
+                capture(env.steps % dc.FRAME_EVERY_STEPS == 0)
 
             poses = run.checkpoint in dc.POSE_MODELS
             run.status = "warming"
@@ -313,7 +352,9 @@ class RunManager:
             while True:
                 if run.stop_event.is_set():
                     raise RunInterrupted("stopped")
-                if deadline_box[0] is not None and time.monotonic() > deadline_box[0]:
+                if deadline_box[0] is not None and env.sim_seconds > deadline_box[0]:
+                    raise RunInterrupted("timeout")
+                if time.monotonic() > deadline_box[1]:
                     raise RunInterrupted("timeout")
                 time.sleep(max(0.0, config.MIN_CALL_INTERVAL_S - (time.monotonic() - last_call)))
                 last_call = time.monotonic()
@@ -337,14 +378,15 @@ class RunManager:
                     raise
                 restarts = 0
                 run.api_calls += 1
-                if run.status == "warming":
+                if run.status == "warming":  # timeout_s counts simulated seconds from the first answer
                     run.status = "running"
-                    deadline_box[0] = time.monotonic() + run.timeout_s
+                    deadline_box[0] = env.sim_seconds + run.timeout_s
+                    deadline_box[1] = time.monotonic() + WALL_FACTOR * run.timeout_s
                 left, right = dc.validate_chunk(env, reply, 48, verbose=False)
                 for l_row, r_row in zip(left, right):
                     tick = time.monotonic()
-                    keep = env.steps % dc.FRAME_EVERY_STEPS == 0
                     env.step(l_row, r_row)
+                    keep = env.steps % dc.FRAME_EVERY_STEPS == 0  # same steps the recorder renders: cached
                     capture(keep)
                     if keep:
                         dc.feed(policy, env, windows, run.prompt, run.checkpoint, env.steps, station=poses)
