@@ -2,11 +2,13 @@
 
 import json
 import sqlite3
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from typing import Any
 
 from app.db.database import Database
 from app.errors import ConflictError, NotFoundError
+from app.schemas.devices import slugify
 
 
 def now() -> str:
@@ -112,6 +114,96 @@ def delete_workflow(db: Database, workflow_id: int) -> None:
     with db.connect() as conn:
         if conn.execute("DELETE FROM workflows WHERE id = ?", (workflow_id,)).rowcount == 0:
             raise NotFoundError(f"Workflow {workflow_id} nicht gefunden")
+
+
+# --- Geräte ------------------------------------------------------------------
+
+DEVICE_USING_BLOCKS = {"wait_sensor", "condition", "set_actuator"}
+
+
+def _device(row: sqlite3.Row | None, device_id: str) -> dict[str, Any]:
+    data = _one(row, f"Gerät '{device_id}'")
+    data["config"] = json.loads(data["config"])
+    return data
+
+
+def _device_values(data: dict[str, Any]) -> tuple[Any, ...]:
+    config = data["config"]
+    return (data["name"], data["type"], config["protocol"], json.dumps(config), data["unit"], data["min"], data["max"])
+
+
+def list_devices(db: Database) -> list[dict[str, Any]]:
+    with db.connect() as conn:
+        return [_device(r, r["id"]) for r in conn.execute("SELECT * FROM devices ORDER BY created_at, rowid")]
+
+
+def get_device(db: Database, device_id: str) -> dict[str, Any]:
+    with db.connect() as conn:
+        return _device(conn.execute("SELECT * FROM devices WHERE id = ?", (device_id,)).fetchone(), device_id)
+
+
+def _insert_device(conn: sqlite3.Connection, device_id: str, data: dict[str, Any]) -> None:
+    ts = now()
+    conn.execute(
+        "INSERT INTO devices (id, name, type, protocol, config, unit, min, max, created_at, updated_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (device_id, *_device_values(data), ts, ts),
+    )
+
+
+def create_device(db: Database, data: dict[str, Any]) -> dict[str, Any]:
+    """Legt ein Gerät an; die ID wird aus dem Namen gebildet (bei Kollision -2, -3 …) und bleibt danach fest."""
+    base = slugify(data["name"])
+    with db.connect() as conn:
+        taken = {r["id"] for r in conn.execute("SELECT id FROM devices WHERE id = ? OR id LIKE ?", (base, f"{base}-%"))}
+        device_id, n = base, 1
+        while device_id in taken:
+            n += 1
+            device_id = f"{base}-{n}"
+        _insert_device(conn, device_id, data)
+    return get_device(db, device_id)
+
+
+def update_device(db: Database, device_id: str, data: dict[str, Any]) -> dict[str, Any]:
+    with db.connect() as conn:
+        cur = conn.execute(
+            "UPDATE devices SET name = ?, type = ?, protocol = ?, config = ?, unit = ?, min = ?, max = ?,"
+            " updated_at = ?"
+            " WHERE id = ?",
+            (*_device_values(data), now(), device_id),
+        )
+    if cur.rowcount == 0:
+        raise NotFoundError(f"Gerät '{device_id}' nicht gefunden")
+    return get_device(db, device_id)
+
+
+def delete_device(db: Database, device_id: str) -> None:
+    with db.connect() as conn:
+        if conn.execute("DELETE FROM devices WHERE id = ?", (device_id,)).rowcount == 0:
+            raise NotFoundError(f"Gerät '{device_id}' nicht gefunden")
+
+
+def seed_devices(db: Database, devices: Iterable[dict[str, Any]]) -> None:
+    """Startbestand nur in eine leere Tabelle schreiben (gelöschte Geräte kommen nicht zurück)."""
+    with db.connect() as conn:
+        if conn.execute("SELECT 1 FROM devices LIMIT 1").fetchone() is not None:
+            return
+        for data in devices:
+            _insert_device(conn, data["id"], data)
+
+
+def workflows_using_device(db: Database, device_id: str) -> list[dict[str, Any]]:
+    """Gespeicherte Workflows, deren Sensor-/Aktor-Blöcke auf das Gerät verweisen."""
+    using = []
+    with db.connect() as conn:
+        for row in conn.execute("SELECT id, name, definition FROM workflows ORDER BY id"):
+            blocks = json.loads(row["definition"]).get("blocks", [])
+            if any(
+                b.get("type") in DEVICE_USING_BLOCKS and (b.get("params") or {}).get("device") == device_id
+                for b in blocks
+            ):
+                using.append({"id": row["id"], "name": row["name"]})
+    return using
 
 
 # --- Läufe und Protokoll -----------------------------------------------------

@@ -39,3 +39,16 @@ CREATE TABLE IF NOT EXISTS run_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_run_log_run ON run_log(run_id, id);
+
+CREATE TABLE IF NOT EXISTS devices (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    protocol TEXT NOT NULL,
+    config TEXT NOT NULL,
+    unit TEXT,
+    min REAL,
+    max REAL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
