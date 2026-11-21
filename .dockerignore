@@ -4,3 +4,5 @@
 .venv
 **/__pycache__
 src/Backend/data/
+**/node_modules
+**/dist

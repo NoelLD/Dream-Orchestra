@@ -2,3 +2,5 @@
 /.env.*
 !/.env.template
 __pycache__/
+node_modules/
+dist/
