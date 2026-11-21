@@ -17,8 +17,13 @@ services:
     init: true
     ports:
       - "127.0.0.1:8000:8000"
+    # Dev-Start mit Reload; Polling, weil das Repo im Windows-Dateisystem liegen kann.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "app"]
+    environment:
+      WATCHFILES_FORCE_POLLING: "true"
     volumes:
       - ./src/Backend:/app:ro
+      - ./src/Backend/data:/app/data
     env_file:
       - path: .env
         required: false

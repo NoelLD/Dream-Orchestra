@@ -1,0 +1,24 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+# /app ist schreibgeschützt eingebunden
+addopts = "-p no:cacheprovider -q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+cache-dir = "/tmp/ruff-cache"
+extend-exclude = ["_old_draft"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC", "SIM", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003", "B008"]  # deutsche Anführungszeichen; FastAPI Body()-Defaults
+
+[tool.mypy]
+python_version = "3.12"
+files = ["app"]
+exclude = ["_old_draft"]
+cache_dir = "/tmp/mypy-cache"
+strict = true
+plugins = ["pydantic.mypy"]
