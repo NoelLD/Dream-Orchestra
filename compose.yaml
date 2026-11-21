@@ -28,15 +28,38 @@ services:
       - path: .env
         required: false
 
+  # MuJoCo YAM scene + Dream-1 control loop + FastAPI (API contract: src/Simulation/README.md, docs at /docs).
   simulation:
     build:
       context: .
       dockerfile: src/Simulation/Dockerfile
+    image: dreamorchestra-simulation:local
     init: true
+    working_dir: /data
     ports:
       - "127.0.0.1:3001:3001"
     volumes:
       - ./src/Simulation:/app:ro
+      - ./src/Simulation/data:/data
+    env_file:
+      - path: .env
+        required: false
+
+  # Optional: live MuJoCo window in the browser (noVNC), http://localhost:6080/vnc.html?autoconnect=1&resize=scale
+  simulation-gui:
+    image: dreamorchestra-simulation:local
+    profiles: ["gui"]
+    init: true
+    working_dir: /data
+    environment:
+      MUJOCO_GL: glfw
+      LIBGL_ALWAYS_SOFTWARE: "1"
+    ports:
+      - "127.0.0.1:6080:6080"
+    volumes:
+      - ./src/Simulation:/app:ro
+      - ./src/Simulation/data:/data
+    command: ["bash", "/app/tools/gui.sh", "python", "/app/tools/view_pickup.py"]
 
   database:
     build:
