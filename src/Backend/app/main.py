@@ -15,7 +15,7 @@ from app.api.deps import Services
 from app.config import Settings, get_settings
 from app.db import repo
 from app.db.database import Database
-from app.devices.adapter import VirtualAdapter
+from app.devices.adapter import DeviceRegistry
 from app.dream.client import DreamClient
 from app.dream.fake import FakeDreamClient
 from app.dream.simulation import SimulationApi, SimulationDreamClient
@@ -36,7 +36,7 @@ def build_services(settings: Settings) -> Services:
         sim_mode = "dream" if settings.dream_api_mode == "real" else "mock"
         dream = SimulationDreamClient(sim_api, sim_mode=sim_mode, label=settings.dream_api_mode)
     db = Database(settings.database_path)
-    devices = VirtualAdapter()
+    devices = DeviceRegistry(db)
     registry = RunRegistry(
         db,
         dream=dream,
@@ -58,6 +58,7 @@ def create_app(settings: Settings | None = None, factory: Callable[[Settings], S
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         services = factory(settings)
         services.db.init_schema(settings.schema_path)
+        services.devices.load()
         repo.fail_open_runs(services.db)
         app.state.services = services
         logger.info("Dream-Modus: %s (%s)", settings.dream_api_mode, settings.api_banner)

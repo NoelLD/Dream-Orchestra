@@ -9,10 +9,11 @@ app/
   errors.py       AppError & Co. (ohne FastAPI)
   runs.py         RunRegistry – einziger globaler Zustand, Läufe als asyncio-Tasks
   api/            Router: health, skills, workflows, runs, devices, training, simulation
-  schemas/        Pydantic: workflow.py (Workflow-JSON, Parameter), models.py (Skill, Run, Device, Status)
+  schemas/        Pydantic: workflow.py (Workflow-JSON, Parameter), models.py (Skill, Run, Device, Status),
+                  devices.py (Gerätetyp, Protokoll-Einstellungen MQTT/OPC UA)
   engine/         engine.py (Zustandsmaschine), validation.py (F4/F15) – rein, ohne FastAPI
   dream/          client.py (Protokoll), fake.py (FakeDreamClient), simulation.py (HTTP zum Simulationsdienst)
-  devices/        adapter.py (DeviceAdapter-Protokoll, VirtualAdapter)
+  devices/        adapter.py (DeviceAdapter-Protokoll, VirtualAdapter, DeviceRegistry mit SQLite-Stamm)
   db/             database.py (sqlite3), repo.py (Repository-Funktionen)
 models/schema.sql Schema; vorhandene Tabellen nicht ändern, neue nur mit CREATE TABLE IF NOT EXISTS
 docs/dream-sdk.md Belegte SDK-Aufrufe

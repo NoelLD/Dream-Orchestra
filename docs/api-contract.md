@@ -25,8 +25,11 @@ Diese Datei fasst es zusammen und beschreibt, wie das Frontend es nutzt.
 | GET | `/api/runs` | letzte Läufe | – |
 | GET | `/api/runs/{id}?after=<cursor>` | Status, `active_block_id`, `credits_used`, `log` (ab Cursor), `cursor` | `getRun()` (Polling, ganzes Protokoll) |
 | POST | `/api/runs/{id}/stop` \| `pause` \| `resume` \| `step` | Steuerung (F7, F8) | `stopRun()`, `pauseRun()`, `resumeRun()`, `stepRun()` |
-| GET | `/api/devices` | Geräteleiste (mit `unit`, `min`, `max` bei Zahlenwerten) | `listDevices()` |
-| PUT | `/api/devices/{id}` | `{value}`; nur Sensoren (`409` bei Aktoren) | `setDevice()` |
+| GET | `/api/devices` | Geräte mit `protocol`, `config` (ohne Passwort, dafür `password_set`), `simulated`, Wert; `unit`, `min`, `max` bei Zahlenwerten | `listDevices()` |
+| POST | `/api/devices` | `{name, type, config, unit?, min?, max?}` → `201`; ID wird aus dem Namen gebildet | `createDevice()` → Ansicht „Geräte“ |
+| PUT | `/api/devices/{id}` | wie POST; leeres Passwort = unverändert; `409` bei Wechsel Sensor↔Aktor, solange ein gespeicherter Workflow das Gerät nutzt | `updateDevice()` |
+| DELETE | `/api/devices/{id}` | `204`; `409` mit `details: [{id, name}]` der Workflows, die das Gerät nutzen | `deleteDevice()` |
+| PUT | `/api/devices/{id}/value` | `{value}`; nur Sensoren (`409` bei Aktoren) | `setDevice()` |
 | GET/POST | `/api/training/datasets`, `GET …/{name}`, `POST …/{name}/upload` | Durchgriff auf den Simulationsdienst | – |
 | GET/POST | `/api/training/finetune`, `GET …/{job_id}` | Fine-Tuning (kostet Credits, `confirm_cost_usd`) | – |
 | GET | `/api/simulation/skills`, `/api/simulation/runs/{run_id}` | Skills und Laufdetails des Simulationsdienstes | – |
@@ -76,7 +79,16 @@ Beispiel (Backend-Format):
   Protokoll `ts` ← `timestamp`, `level` `warning` → `warn`, `nodeId` ← `block_id`, `apiStatus`, `durationMs`.
 - Status: `running`, `paused`, `succeeded`, `failed`, `stopped`. Es läuft ein Lauf zur Zeit.
 
-## Geräte (virtuell, nach Backend-Neustart wieder Startwert)
+## Geräte
+
+Stammdaten liegen in der Tabelle `devices` (SQLite), Werte werden simuliert und stehen nach einem Neustart wieder auf
+ihrem Startwert. `config` je Protokoll:
+
+- `virtual`: `{protocol}`
+- `mqtt`: `{protocol, host, port=1883, topic, qos=0, username?, password?, tls=false, payload_path?}`
+- `opcua`: `{protocol, endpoint (opc.tcp://…), node_id, security_mode=None|Sign|SignAndEncrypt, username?, password?}`
+
+Startbestand (Protokoll `virtual`, wird nur in eine leere Tabelle geschrieben):
 
 | ID | Typ | Art |
 |---|---|---|

@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -84,6 +85,9 @@ class DeviceOut(BaseModel):
     unit: str | None = None
     min: float | None = None
     max: float | None = None
+    protocol: str = Field(description="virtual | mqtt | opcua")
+    config: dict[str, Any] = Field(description="Protokoll-Einstellungen ohne Passwort (stattdessen password_set)")
+    simulated: bool = Field(default=True, description="Werte werden simuliert (noch keine echte Verbindung)")
 
 
 class DeviceValue(BaseModel):

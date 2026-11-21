@@ -74,7 +74,7 @@ def test_invalid_workflow_does_not_start(client: TestClient) -> None:
 
 def test_demo_run_with_sensor_loop(client: TestClient) -> None:
     workflow_id = create_demo(client)
-    client.put("/api/devices/weitere-objekte", json={"value": True})
+    client.put("/api/devices/weitere-objekte/value", json={"value": True})
     started = client.post("/api/runs", json={"workflow_id": workflow_id})
     assert started.status_code == 202
     run_id = started.json()["id"]
@@ -85,8 +85,8 @@ def test_demo_run_with_sensor_loop(client: TestClient) -> None:
 
     wait_for(get, lambda r: r["active_block_id"] == "wait")
     assert client.post("/api/runs", json={"workflow_id": workflow_id}).status_code == 409  # nur ein Lauf
-    client.put("/api/devices/weitere-objekte", json={"value": False})  # keine weitere Runde
-    client.put("/api/devices/lichtschranke", json={"value": True})
+    client.put("/api/devices/weitere-objekte/value", json={"value": False})  # keine weitere Runde
+    client.put("/api/devices/lichtschranke/value", json={"value": True})
     final = wait_for(get, lambda r: r["status"] != "running")
     assert final["status"] == "succeeded"
     assert final["credits_used"] >= 1
@@ -123,10 +123,10 @@ def test_devices(client: TestClient) -> None:
         "lampe-rot",
         "foerderband",
     } <= devices.keys()
-    assert client.put("/api/devices/fuellstand", json={"value": 4.5}).json()["value"] == 4.5
-    assert client.put("/api/devices/lampe", json={"value": True}).status_code == 409  # Aktor
-    assert client.put("/api/devices/weitere-objekte", json={"value": 3}).status_code == 422
-    assert client.put("/api/devices/gibtsnicht", json={"value": True}).status_code == 404
+    assert client.put("/api/devices/fuellstand/value", json={"value": 4.5}).json()["value"] == 4.5
+    assert client.put("/api/devices/lampe/value", json={"value": True}).status_code == 409  # Aktor
+    assert client.put("/api/devices/weitere-objekte/value", json={"value": 3}).status_code == 422
+    assert client.put("/api/devices/gibtsnicht/value", json={"value": True}).status_code == 404
 
 
 def test_training_proxy_reports_unreachable_simulation(client: TestClient) -> None:
