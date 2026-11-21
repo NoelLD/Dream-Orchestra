@@ -1,22 +1,51 @@
 # DreamOrchestra
 
-Der Container enthält Python 3.12 und das Dream-Labs-SDK. `src/test_dream_api.py` ruft den Modellkatalog ab und zeigt die SDK-Version und die Anzahl der verfügbaren Checkpoints an.
+Docker Compose startet das Frontend mit Nginx, das Backend mit Python 3.12, den Simulationsdienst mit Node.js 24 und den SQLite-Datenbankdienst.
 
 ## Setup
 
-1. Docker starten und in den Ordner mit `compose.yaml` wechseln (`implementierung/`).
-2. Falls `.env` fehlt, `.env.template` als `.env` kopieren. Den API-Key als `DREAM_API_KEY` in `.env` eintragen. [Dream-Labs-Plattform](https://platform.dreamlabs.ai/)
-3. Image bauen und den Test starten.
+Docker starten und in den Ordner mit `compose.yaml` wechseln (`implementierung/`). Alle vier Dienste starten mit `docker compose up`. Mit `--build` werden die Images vorher gebaut.
 
-   ```sh
-   docker compose run --rm --build api-test
-   ```
+```sh
+docker compose up --build
+```
 
-Ohne Compose in PowerShell `./start.ps1` ausführen. Der Quellcode aus `src/` wird beim Build ins Image kopiert. Nach Codeänderungen den Startbefehl erneut ausführen.
+Für einen einzelnen Dienst beispielsweise `docker compose up --build backend` ausführen. Die Dienstnamen und lokalen Adressen stehen in der Tabelle.
+
+| Dienst | Quellordner mit Dockerfile | Adresse |
+| --- | --- | --- |
+| `frontend` | `src/Frontend` | `http://localhost:8080` |
+| `backend` | `src/Backend` | `http://localhost:8000/health` |
+| `simulation` | `src/Simulation` | `http://localhost:3001/health` |
+| `database` | `src/Database` | `http://database:8081/health` im Compose-Netz |
+
+Compose bindet jeden Quellordner schreibgeschützt ein. Nach Änderungen am Backend oder Simulationsserver den Dienst neu starten, beispielsweise mit `docker compose restart backend`. `docker compose down` stoppt die Dienste.
+
+## SQLite und Datenmodell
+
+Der Dienst `database` legt beim ersten Start `src/Backend/data/dreamorchestra.sqlite3` an. Die Datei bleibt nach `docker compose down` auf dem Host erhalten und wird von Git ignoriert. Über `http://localhost:8000/health/database` prüft das Backend die Verbindung zum Datenbankdienst.
+
+Das Schema liegt in [`src/Backend/models/schema.sql`](src/Backend/models/schema.sql) und enthält als Ausgangspunkt die Tabelle `skills`. Der Datenbankdienst führt das Schema bei jedem Start aus. Neue Tabellen mit `CREATE TABLE IF NOT EXISTS` ergänzen und `docker compose restart database` ausführen. Änderungen an vorhandenen Tabellen brauchen eine gezielte Migration.
+
+Für SQL-Abfragen die SQLite-Shell im Datenbankcontainer öffnen. [Python-Dokumentation zur SQLite-Shell](https://docs.python.org/3.12/library/sqlite3.html#command-line-interface)
+
+```sh
+docker compose exec database python -m sqlite3 /data/dreamorchestra.sqlite3
+```
+
+## Dream-Labs-Verbindungstest
+
+Falls `.env` fehlt, `.env.template` als `.env` kopieren. Dann `DREAM_API_KEY` eintragen. Der Test ruft den Modellkatalog ab und zeigt SDK-Version und Anzahl der Checkpoints an. [Dream-Labs-Plattform](https://platform.dreamlabs.ai/)
+
+```sh
+docker compose run --rm --build backend python test_dream_api.py
+```
+
+In PowerShell startet `./start.ps1` den Verbindungstest auch ohne Compose.
 
 ## Umgebungsvariablen
 
-Die Werte in `.env` als `NAME=Wert` ohne Anführungszeichen eintragen. Die optionalen URLs nur ändern, wenn Dream Labs für den Zugang andere Adressen vorgibt.
+Compose übergibt `.env` an den Backend-Dienst. Der Dream-Labs-Verbindungstest benötigt den API-Key. Werte als `NAME=Wert` ohne Anführungszeichen eintragen. Die optionalen URLs nur ändern, wenn Dream Labs für den Zugang andere Adressen vorgibt.
 
 | Variable | Zweck | Standard |
 | --- | --- | --- |

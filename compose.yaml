@@ -1,5 +1,44 @@
+name: dreamorchestra
+
 services:
-  api-test:
-    build: .
-    image: dreamorchestra-api-test:local
-    env_file: .env
+  frontend:
+    build:
+      context: .
+      dockerfile: src/Frontend/Dockerfile
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./src/Frontend:/app:ro
+
+  backend:
+    build:
+      context: .
+      dockerfile: src/Backend/Dockerfile
+    init: true
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./src/Backend:/app:ro
+    env_file:
+      - path: .env
+        required: false
+
+  simulation:
+    build:
+      context: .
+      dockerfile: src/Simulation/Dockerfile
+    init: true
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - ./src/Simulation:/app:ro
+
+  database:
+    build:
+      context: .
+      dockerfile: src/Database/Dockerfile
+    init: true
+    volumes:
+      - ./src/Database:/app:ro
+      - ./src/Backend/models:/schema:ro
+      - ./src/Backend/data:/data

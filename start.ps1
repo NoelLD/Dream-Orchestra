@@ -11,10 +11,11 @@ if (-not (Test-Path -LiteralPath $envFile -PathType Leaf)) {
 }
 
 $image = 'dreamorchestra-api-test:local'
-& $docker.Source build --tag $image $PSScriptRoot
+$dockerfile = Join-Path $PSScriptRoot 'src/Backend/Dockerfile'
+& $docker.Source build --file $dockerfile --tag $image $PSScriptRoot
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-& $docker.Source run --rm --env-file $envFile $image
+& $docker.Source run --rm --env-file $envFile $image python test_dream_api.py
 exit $LASTEXITCODE
