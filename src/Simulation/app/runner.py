@@ -37,6 +37,7 @@ RECORD_EVERY = 4  # sim steps are 50 ms -> 5 fps video; the same frames feed Dre
 VIDEO_FPS = 5
 WALL_FACTOR = 10  # hard wall-clock cap per attempt: 10x timeout_s (software rendering is slower than real time)
 WARMING_CAP_S = 3600  # a fine-tune may take up to 1 h to start
+TRANSIENT_RETRIES = 2  # per attempt, for DreamTimeout / unreachable / retryable 5xx
 REHOME_STEPS = 20  # 1 s of sim time to drive both arms back to home before a new attempt
 HOME = np.r_[np.zeros(6), 1.0]  # six joints at zero, gripper open
 
@@ -441,7 +442,7 @@ class RunManager:
         """One prompt attempt: call Dream-1 chunk by chunk until the sim says success or the attempt times out."""
         spec = run.spec
         dc.feed(policy, env, windows, prompt, spec.checkpoint, env.steps, every=0, station=poses)
-        restarts, last_call, answered = 0, 0.0, False
+        restarts, transient, last_call, answered = 0, 0, 0.0, False
         while True:
             if run.stop_event.is_set():
                 raise RunInterrupted("stopped")
@@ -463,6 +464,12 @@ class RunManager:
                 if type(error).__name__ == "DreamSessionExpired" and restarts < 3:
                     restarts += 1
                     continue
+                if _is_transient(error) and transient < TRANSIENT_RETRIES:  # network blip: same request again
+                    transient += 1
+                    log.warning("run %s: transient Dream error (%s), retry %d", run.run_id, type(error).__name__,
+                                transient)
+                    time.sleep(2 * transient)
+                    continue
                 if not poses and dc.needs_poses(error):
                     policy.close()
                     poses = True
@@ -470,7 +477,7 @@ class RunManager:
                     dc.feed(policy, env, windows, prompt, spec.checkpoint, env.steps, every=0, station=poses)
                     continue
                 raise
-            restarts = 0
+            restarts = transient = 0
             run.api_calls += 1
             record["api_calls"] += 1
             if not answered:  # timeout_s counts simulated seconds from the first answer of this attempt
@@ -511,6 +518,11 @@ def _new_episode(policy, dc, checkpoint, gateway, poses, key):
         return policy
     policy.close()
     return dc.open_policy(dc.policy_config(checkpoint, gateway, poses), key)
+
+
+def _is_transient(error: Exception) -> bool:
+    """Timeouts, unreachable service and retryable 5xx refusals are worth one more try; refusals are not."""
+    return type(error).__name__ in ("DreamTimeout", "DreamProtocolError") or bool(getattr(error, "retryable", False))
 
 
 def _is_warming(error: Exception) -> bool:
