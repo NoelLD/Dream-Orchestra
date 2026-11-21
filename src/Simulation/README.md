@@ -1,6 +1,6 @@
 # Simulation-Dienst (`simulation`)
 
-> **API v0.3 (21.11.2026).** Beide Modi laufen. `mock`: 14 pytest-Tests grün. `dream`: am 21.11. gegen die echte API
+> **API v0.3 (21.11.2026).** Beide Modi laufen. `mock`: 15 pytest-Tests grün. `dream`: am 21.11. gegen die echte API
 > geprüft. `pick-banana` mit `dreamlabs/dream-1-beta` zero-shot `succeeded` (Banane 8,3 cm angehoben, 7 Aufrufe,
 > 34 s, ~0,01 $). Ein erster Lauf davor endete mit `timeout`. Einzelläufe sind keine Erfolgsquote.
 > Live-Doku der laufenden API: http://localhost:3001/docs
@@ -30,6 +30,9 @@ curl localhost:3001/runs/<run_id>                 # Status abfragen, bis er term
 docker compose --profile gui up -d simulation-gui # optional: MuJoCo-Fenster im Browser, Port 6080
 ```
 
+- **Testkonsole:** http://localhost:3001/demo. Sie wird vom Simulations-Dienst selbst ausgeliefert, ist eine Testseite und nicht das Produkt-Frontend: Lauf starten und stoppen, Livebild, Versuche, Video, Evaluationsergebnis mit Wilson-Intervall. Quelltext in `app/static/demo.html`, eine Referenz für die Frontend-Anbindung.
+- **Prompt für das Frontend-Team:** [`FRONTEND_PROMPT.md`](FRONTEND_PROMPT.md).
+
 - Tests (Modus `mock`, keine Credits): `docker compose run --rm -e DREAM_API_KEY= simulation bash -c "cd /app && python -m pytest -q -p no:cacheprovider tests"`
 - Der API-Key kommt aus `.env` (`DREAM_API_KEY`). Keine Antwort und kein Log enthält ihn (N1). Ohne Key gibt es nur `mock`.
 - Laufzeitdaten (Läufe, Videos, Datasets) liegen in `src/Simulation/data/` (vom Host eingebunden, von Git ignoriert).
@@ -47,7 +50,8 @@ docker compose --profile gui up -d simulation-gui # optional: MuJoCo-Fenster im 
 | `app/embodiment.py` | YAM-Embodiment (14 Werte, rechter Arm zuerst, 3 Kameras) |
 | `app/config.py` | Pfade und Einstellungen (Umgebungsvariablen) |
 | `tools/` | Kommandozeilen-Werkzeuge, siehe unten |
-| `tests/test_api.py` | 14 API-Tests im Modus `mock` |
+| `tests/test_api.py` | 15 API-Tests im Modus `mock` |
+| `app/static/demo.html` | Testkonsole (`GET /demo`) |
 | `Dockerfile` | Python 3.12, MuJoCo, Mesa-Rendering ohne GPU, noVNC. Das Dream-Labs-Beispiel `yam_mujoco` ist auf Commit `ba8ad98` gepinnt |
 
 Die Szene stammt aus dem Dream-Labs-Beispiel `dream_library/examples/yam_mujoco`: zwei YAM-Arme, Kameras `top`, `left` und `right`, Banane, Apfel, Orange, Flasche, Schale und Teller. Der geskriptete Greifablauf (`mock_pickups.run_trial`) nutzt IK und arbeitet ohne API-Aufrufe.
@@ -236,6 +240,7 @@ Im Container mit `docker compose run --rm simulation python /app/tools/<script> 
 | `MUJOCO_GL` | `egl` | `osmesa` als Ausweichlösung |
 | `SIM_DATA_DIR` | `/data` | Läufe, Videos, Datasets |
 | `SIM_DEFAULT_TIMEOUT_S` / `SIM_DEFAULT_MOCK_TIMEOUT_S` | `60` / `60` | Standard-Zeitlimits (simulierte Sekunden) |
+| `SIM_CORS_ORIGINS` | `http://localhost:8080,http://127.0.0.1:8080` | Origins, die die API direkt aus dem Browser aufrufen dürfen (Frontend) |
 | `SIM_BUDGET_USD` | `10` | Harte Grenze für die geschätzten Dream-Kosten aller Läufe dieses Dienstes |
 | `SIM_RENDER_SHADOWS` | `0` | `1` = Schatten und Spiegelungen in Läufen (wie in den Trainingsdaten), etwa 3× langsamer bei Software-Rendering |
 | `SIM_MIN_CALL_INTERVAL_S` | `0.7` | Mindestabstand zwischen API-Aufrufen (Ratenlimit: 3 schnelle, danach 1 pro 0,7 s; N5) |

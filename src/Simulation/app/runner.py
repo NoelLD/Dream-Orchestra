@@ -178,6 +178,7 @@ class RunManager:
         self.runs: dict[str, Run] = {}
         self.history: list[dict] = []  # finished runs from earlier service starts
         self.latest_jpeg: bytes | None = None
+        self.preview_lock = threading.Lock()
         config.ensure_dirs()
         for path in sorted(config.RUNS_DIR.glob("run_*.json")):
             try:
@@ -242,6 +243,12 @@ class RunManager:
         """Newest frame of the current/last run, or a fresh render of the start scene."""
         if self.latest_jpeg is not None:
             return self.latest_jpeg
+        with self.preview_lock:  # one render at a time: every scene + renderer costs a few hundred MB
+            if self.latest_jpeg is not None:
+                return self.latest_jpeg
+            return self._render_preview()
+
+    def _render_preview(self) -> bytes:
         config.import_example()
         from yam_env import YamEnv
 
@@ -449,8 +456,7 @@ class RunManager:
             try:
                 reply = policy.get_action()
             except Exception as error:
-                code = getattr(error, "code", None) or getattr(error, "reason", None)
-                if code == "pool_warming":  # the model is starting; not counted against timeout_s
+                if _is_warming(error):  # the model is starting (NO_CAPACITY/pool_warming); not counted as timeout
                     run.status = "warming"
                     time.sleep(min(float(getattr(error, "retry_after_s", 10) or 10), 30))
                     continue
@@ -505,6 +511,12 @@ def _new_episode(policy, dc, checkpoint, gateway, poses, key):
         return policy
     policy.close()
     return dc.open_policy(dc.policy_config(checkpoint, gateway, poses), key)
+
+
+def _is_warming(error: Exception) -> bool:
+    """Dream refuses with code NO_CAPACITY and reason pool_warming while a model starts ("no live serve yet")."""
+    tags = {str(getattr(error, attr, "") or "").lower() for attr in ("code", "reason")}
+    return "pool_warming" in tags or "pool_warming" in str(error)
 
 
 def _describe(error: Exception) -> str:

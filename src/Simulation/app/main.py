@@ -2,11 +2,13 @@
 
 import logging
 import random
+from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field, field_validator
 
@@ -25,8 +27,12 @@ app = FastAPI(
     "budget, evaluates prompt/checkpoint/retry variants, builds demo datasets and starts Dream Labs fine-tunes. "
     "Success is measured by the simulator.",
 )
+# The frontend (nginx, :8080) may call this API straight from the browser, e.g. for /frame.jpg.
+app.add_middleware(CORSMiddleware, allow_origins=config.CORS_ORIGINS, allow_methods=["GET", "POST"],
+                   allow_headers=["Content-Type"])
 runs = RunManager()
 evals = EvalManager(runs)
+DEMO_PAGE = Path(__file__).resolve().parent / "static/demo.html"
 training = TrainingState()
 
 
@@ -118,6 +124,12 @@ def health():
     return {"status": "ok", "service": "simulation", "dream_key_set": config.dream_key_set(),
             "modes": ["mock", "dream"] if config.dream_key_set() else ["mock"],
             "active_run_id": active["run_id"] if active else None, "version": app.version}
+
+
+@app.get("/demo", include_in_schema=False)
+def demo():
+    """Test console of the simulation service (not the product frontend)."""
+    return FileResponse(DEMO_PAGE, media_type="text/html")
 
 
 @app.get("/skills")

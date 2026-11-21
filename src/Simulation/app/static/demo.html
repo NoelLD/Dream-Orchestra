@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulation Testkonsole</title>
+<style>
+  :root {
+    --surface-0: #f4f4f2; --surface-1: #fcfcfb; --border: #dddcd7;
+    --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #7a7974;
+    --series-1: #2a78d6; --good: #0d7a3a; --warn: #a15c00; --bad: #c0362c; --mock: #6250d6;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface-0: #121211; --surface-1: #1a1a19; --border: #33332f;
+      --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86;
+      --series-1: #3987e5; --good: #3fb36b; --warn: #e0a030; --bad: #e66767; --mock: #9085e9;
+    }
+  }
+  :root[data-theme="dark"] {
+    --surface-0: #121211; --surface-1: #1a1a19; --border: #33332f;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86;
+    --series-1: #3987e5; --good: #3fb36b; --warn: #e0a030; --bad: #e66767; --mock: #9085e9;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--surface-0); color: var(--text-primary);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 14px 16px; border-bottom: 1px solid var(--border); background: var(--surface-1);
+           display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; }
+  header h1 { font-size: 17px; margin: 0; }
+  .tag { font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--border); color: var(--text-secondary); }
+  .tag.test { border-color: var(--warn); color: var(--warn); }
+  .tag.mock { border-color: var(--mock); color: var(--mock); font-weight: 600; }
+  main { display: grid; gap: 16px; padding: 16px; max-width: 1200px; margin: 0 auto;
+         grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 900px) { main { grid-template-columns: 360px minmax(0, 1fr); } }
+  section { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; min-width: 0; }
+  h2 { font-size: 14px; margin: 0 0 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .04em; }
+  label { display: block; font-size: 13px; color: var(--text-secondary); margin: 8px 0 3px; }
+  input, select, textarea { width: 100%; font: inherit; padding: 7px 9px; border-radius: 8px;
+         border: 1px solid var(--border); background: var(--surface-0); color: var(--text-primary); }
+  .row { display: flex; gap: 8px; } .row > * { flex: 1; min-width: 0; }
+  button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border);
+           background: var(--surface-0); color: var(--text-primary); cursor: pointer; }
+  button.primary { background: var(--series-1); border-color: var(--series-1); color: #fff; }
+  button.stop { border-color: var(--bad); color: var(--bad); font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
+  .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .frame { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; object-fit: contain; display: block; }
+  .status { font-weight: 600; } .s-succeeded { color: var(--good); } .s-failed, .s-timeout, .s-error { color: var(--bad); }
+  .s-stopped { color: var(--warn); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text-secondary); font-weight: 500; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; font-size: 13px; }
+  .kv dt { color: var(--text-secondary); } .kv dd { margin: 0; overflow-wrap: anywhere; }
+  .muted { color: var(--text-muted); font-size: 12px; }
+  a { color: var(--series-1); }
+  .err { color: var(--bad); font-size: 13px; overflow-wrap: anywhere; }
+  video { width: 100%; border-radius: 8px; margin-top: 8px; }
+  .chart svg { width: 100%; height: auto; display: block; }
+  .chart text { fill: var(--text-secondary); font-size: 12px; }
+  .chart .grid { stroke: var(--border); stroke-width: 1; }
+  .chart .ci { stroke: var(--series-1); stroke-width: 2; stroke-linecap: round; }
+  .chart .final { fill: var(--series-1); stroke: var(--surface-1); stroke-width: 2; }
+  .chart .first { fill: var(--surface-1); stroke: var(--series-1); stroke-width: 2; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--text-secondary); margin: 4px 0 8px; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+        margin-right: 5px; vertical-align: -1px; border: 2px solid var(--series-1); }
+  .legend .l-final::before { background: var(--series-1); } .legend .l-first::before { background: var(--surface-1); }
+  #tip { position: fixed; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border);
+         padding: 6px 8px; border-radius: 6px; font-size: 12px; display: none; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Simulation Testkonsole</h1>
+  <span class="tag test">Testseite des Simulations-Dienstes, nicht das Produkt-Frontend</span>
+  <span class="tag" id="health">verbinde …</span>
+  <span class="tag" id="budget">Budget …</span>
+</header>
+<main>
+  <div style="display:grid;gap:16px;min-width:0">
+    <section>
+      <h2>Skill-Lauf</h2>
+      <label for="skill">Skill</label>
+      <select id="skill"></select>
+      <div class="row">
+        <div><label for="mode">Modus</label>
+          <select id="mode"><option value="dream">dream (echte API, kostet Credits)</option>
+            <option value="mock">mock (SIMULIERTE API, kostenlos)</option></select></div>
+        <div><label for="checkpoint">Modell</label>
+          <select id="checkpoint"><option>dreamlabs/dream-1-beta</option><option>dreamlabs/dream-1-beta-flash</option></select></div>
+      </div>
+      <label for="prompt">Prompt (leer = Standard des Skills)</label>
+      <input id="prompt" placeholder="pick up the banana">
+      <div class="row">
+        <div><label for="attempts">Versuche</label><input id="attempts" type="number" min="1" max="5" value="1"></div>
+        <div><label for="timeout">Zeitlimit (Sim-s)</label><input id="timeout" type="number" min="5" max="600" value="30"></div>
+        <div><label for="seed">Seed</label><input id="seed" type="number" min="0" placeholder="zufällig"></div>
+      </div>
+      <label for="recovery">Prompts für weitere Versuche (eine Zeile pro Versuch)</label>
+      <textarea id="recovery" rows="2" placeholder="grasp the yellow banana and lift it up"></textarea>
+      <div class="actions">
+        <button class="primary" id="start">Lauf starten</button>
+        <button class="stop" id="stop" disabled>Stopp</button>
+      </div>
+      <div class="err" id="runErr"></div>
+    </section>
+    <section>
+      <h2>Evaluation</h2>
+      <p class="muted">Startet über die API, z. B. <code>POST /evals</code> (siehe <a href="/docs">/docs</a>). Hier: letzte Evaluationen.</p>
+      <select id="evalPick"></select>
+    </section>
+  </div>
+  <div style="display:grid;gap:16px;min-width:0">
+    <section>
+      <h2>Live <span class="tag mock" id="mockBadge" hidden>SIMULIERTE API</span></h2>
+      <img class="frame" id="frame" alt="Aktuelles Kamerabild der Simulation (Draufsicht)">
+      <dl class="kv" id="runInfo" style="margin-top:10px"></dl>
+      <table id="attemptsTable" hidden><thead><tr><th>#</th><th>Prompt</th><th>Aufrufe</th><th>Sim-s</th><th>Erfolg</th></tr></thead><tbody></tbody></table>
+      <video id="video" controls hidden></video>
+    </section>
+    <section class="chart">
+      <h2 id="evalTitle">Evaluationsergebnis</h2>
+      <div class="legend"><span class="l-final">Erfolgsquote (alle Versuche)</span><span class="l-first">nur 1. Versuch</span></div>
+      <div id="evalChart"></div>
+      <table id="evalTable"></table>
+      <p class="muted">Linien: 95-%-Wilson-Intervall. Gemessen in der Simulation, kleine Stichprobe. Kosten sind Schätzungen.</p>
+    </section>
+  </div>
+</main>
+<div id="tip"></div>
+<script>
+const $ = (id) => document.getElementById(id);
+let activeRun = null, framePoll = null;
+
+async function api(path, options) {
+  const res = await fetch(path, options);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail ? `${body.error}: ${body.detail}` : `HTTP ${res.status}`);
+  return body;
+}
+const pct = (x) => x == null ? "–" : `${Math.round(x * 100)} %`;
+const usd = (x) => x == null ? "–" : `${x.toFixed(4)} $`;
+
+async function refreshHeader() {
+  try {
+    const h = await api("/health");
+    $("health").textContent = `Dienst ok · Modi: ${h.modes.join(", ")}`;
+    const b = await api("/budget");
+    $("budget").textContent = `Budget: ${b.spent_usd.toFixed(3)} / ${b.budget_usd} $ (Schätzung)`;
+  } catch (e) { $("health").textContent = "Dienst nicht erreichbar"; }
+}
+
+async function loadSkills() {
+  const skills = await api("/skills");
+  $("skill").innerHTML = skills.map((s) =>
+    `<option value="${s.name}" data-prompt="${s.default_prompt}" data-mock="${s.mock_available}">${s.name} – ${s.description}</option>`).join("");
+  syncSkill();
+}
+function syncSkill() {
+  const opt = $("skill").selectedOptions[0];
+  $("prompt").placeholder = opt.dataset.prompt;
+  $("mode").querySelector('[value="mock"]').disabled = opt.dataset.mock !== "true";
+  if (opt.dataset.mock !== "true") $("mode").value = "dream";
+}
+
+async function startRun() {
+  $("runErr").textContent = "";
+  const body = { skill: $("skill").value, mode: $("mode").value, checkpoint: $("checkpoint").value,
+    max_attempts: +$("attempts").value, timeout_s: +$("timeout").value,
+    recovery_prompts: $("recovery").value.split("\n").map((s) => s.trim()).filter(Boolean) };
+  if ($("prompt").value.trim()) body.prompt = $("prompt").value.trim();
+  if ($("seed").value !== "") body.seed = +$("seed").value;
+  try {
+    const r = await api("/runs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    activeRun = r.run_id; $("video").hidden = true; $("stop").disabled = false; $("start").disabled = true;
+    pollRun();
+  } catch (e) { $("runErr").textContent = e.message; }
+}
+
+async function stopRun() {
+  if (!activeRun) return;
+  try { await api(`/runs/${activeRun}/stop`, { method: "POST" }); } catch (e) { $("runErr").textContent = e.message; }
+}
+
+const TERMINAL = ["succeeded", "failed", "timeout", "stopped", "error"];
+async function pollRun() {
+  if (!activeRun) return;
+  try {
+    const r = await api(`/runs/${activeRun}`);
+    renderRun(r);
+    if (TERMINAL.includes(r.status)) {
+      $("stop").disabled = true; $("start").disabled = false; activeRun = null; refreshHeader();
+      if (r.video_url) { $("video").src = r.video_url; $("video").hidden = false; }
+      return;
+    }
+  } catch (e) { $("runErr").textContent = e.message; }
+  setTimeout(pollRun, 1000);
+}
+
+function renderRun(r) {
+  $("mockBadge").hidden = r.mode !== "mock";
+  const rows = [["Lauf", r.run_id], ["Status", `<span class="status s-${r.status}">${r.status}</span>`],
+    ["Skill", r.skill], ["Modus", r.mode === "mock" ? "mock (SIMULIERTE API)" : `dream · ${r.checkpoint}`],
+    ["Erfolg", r.success == null ? "–" : (r.success ? "ja" : "nein")],
+    ["Detail", Object.entries(r.success_detail || {}).map(([k, v]) => `${k}=${v}`).join(", ") || "–"],
+    ["Aufrufe / Kosten", `${r.api_calls} / ${usd(r.cost_usd)}`], ["Dauer", r.duration_s == null ? "läuft" : `${r.duration_s} s`]];
+  if (r.error) rows.push(["Fehler", `<span class="err">${r.error}</span>`]);
+  $("runInfo").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  const tbody = $("attemptsTable").querySelector("tbody");
+  $("attemptsTable").hidden = !(r.attempts && r.attempts.length);
+  tbody.innerHTML = (r.attempts || []).map((a) =>
+    `<tr><td>${a.attempt}</td><td>${a.prompt ?? "(Skript)"}</td><td>${a.api_calls}</td><td>${a.sim_seconds ?? "–"}</td><td>${a.success ? "ja" : "–"}</td></tr>`).join("");
+}
+
+function startFramePoll() {
+  const tick = () => { $("frame").src = `/frame.jpg?t=${Date.now()}`; };
+  tick(); framePoll = setInterval(tick, 500);
+}
+
+async function loadEvals() {
+  try {
+    const list = await api("/evals");
+    const current = $("evalPick").value;
+    $("evalPick").innerHTML = list.map((e) =>
+      `<option value="${e.eval_id}">${e.eval_id} · ${e.skill} · ${e.status} · ${e.progress.done}/${e.progress.total}</option>`).join("")
+      || "<option value=''>noch keine Evaluation</option>";
+    if (current && list.some((e) => e.eval_id === current)) $("evalPick").value = current;
+    const pick = list.find((e) => e.eval_id === $("evalPick").value);
+    if (pick) renderEval(pick);
+  } catch (e) { /* service restarting */ }
+}
+
+function renderEval(e) {
+  $("evalTitle").textContent = `Evaluation ${e.skill} · ${e.mode} · ${e.progress.done}/${e.progress.total} Läufe · ${e.status}`;
+  const rows = e.summary, W = 640, rowH = 44, left = 110, right = 20, top = 22;
+  const H = top + rows.length * rowH + 24, x = (v) => left + v * (W - left - right);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Erfolgsquote je Variante mit 95-Prozent-Intervall">`;
+  for (const t of [0, .25, .5, .75, 1]) {
+    svg += `<line class="grid" x1="${x(t)}" x2="${x(t)}" y1="${top - 6}" y2="${H - 22}"/>`;
+    svg += `<text x="${x(t)}" y="${H - 6}" text-anchor="middle">${t * 100} %</text>`;
+  }
+  rows.forEach((s, i) => {
+    const y = top + i * rowH + rowH / 2;
+    svg += `<text x="${left - 10}" y="${y + 4}" text-anchor="end">${s.label}</text>`;
+    if (s.n === 0) { svg += `<text x="${x(0) + 6}" y="${y + 4}">noch keine Läufe</text>`; return; }
+    if (s.ci95) svg += `<line class="ci" x1="${x(s.ci95[0])}" x2="${x(s.ci95[1])}" y1="${y}" y2="${y}"/>`;
+    const tip = `${s.label}: ${s.successes}/${s.n} = ${pct(s.success_rate)} (95 %: ${pct(s.ci95?.[0])}–${pct(s.ci95?.[1])}); 1. Versuch ${pct(s.first_attempt_rate)}`;
+    svg += `<circle class="first" cx="${x(s.first_attempt_rate)}" cy="${y}" r="6" data-tip="${tip}"/>`;
+    svg += `<circle class="final" cx="${x(s.success_rate)}" cy="${y}" r="7" data-tip="${tip}"/>`;
+  });
+  $("evalChart").innerHTML = svg + "</svg>";
+  $("evalTable").innerHTML = `<thead><tr><th>Variante</th><th>Erfolge</th><th>Quote</th><th>1. Versuch</th><th>Aufrufe</th><th>Kosten</th><th>$ / Erfolg</th><th>Fehler</th></tr></thead><tbody>` +
+    rows.map((s) => `<tr><td>${s.label}</td><td>${s.successes}/${s.n}</td><td>${pct(s.success_rate)}</td><td>${pct(s.first_attempt_rate)}</td><td>${s.api_calls}</td><td>${usd(s.cost_usd)}</td><td>${usd(s.cost_per_success_usd)}</td><td>${s.errors}</td></tr>`).join("") + "</tbody>";
+}
+
+document.addEventListener("mousemove", (ev) => {
+  const t = ev.target.closest && ev.target.closest("[data-tip]"), tip = $("tip");
+  if (!t) { tip.style.display = "none"; return; }
+  tip.textContent = t.dataset.tip; tip.style.display = "block";
+  tip.style.left = `${Math.min(ev.clientX + 12, innerWidth - tip.offsetWidth - 8)}px`; tip.style.top = `${ev.clientY + 12}px`;
+});
+$("skill").addEventListener("change", syncSkill);
+$("start").addEventListener("click", startRun);
+$("stop").addEventListener("click", stopRun);
+$("evalPick").addEventListener("change", loadEvals);
+refreshHeader(); loadSkills(); startFramePoll(); loadEvals();
+setInterval(loadEvals, 5000); setInterval(refreshHeader, 10000);
+</script>
+</body>
+</html>

@@ -116,3 +116,11 @@ def test_eval_rejects_duplicate_labels_and_training_seeds():
     seeds = client.post("/evals", json={"skill": "pick-banana", "mode": "mock", "seed_start": 1000,
                                         "variants": [{"label": "a"}]})
     assert seeds.status_code == 400
+
+
+def test_demo_page_and_cors_for_frontend():
+    page = client.get("/demo")
+    assert page.status_code == 200 and "Testseite" in page.text
+    preflight = client.options("/runs", headers={"Origin": "http://localhost:8080",
+                                                 "Access-Control-Request-Method": "POST"})
+    assert preflight.headers.get("access-control-allow-origin") == "http://localhost:8080"
