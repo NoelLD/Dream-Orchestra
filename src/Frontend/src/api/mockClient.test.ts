@@ -209,3 +209,19 @@ describe('Mock-Client (Testmodus N2)', () => {
     await expect(api.createSkill({ name: 'Doppelt', description: '' })).rejects.toThrow(/existiert bereits/)
   })
 })
+
+describe('Mock-Client: mehrere Workflows', () => {
+  it('listet zuletzt geänderte zuerst und löscht Workflows', async () => {
+    const a = await api.createWorkflow({ ...linear, name: 'A' })
+    now = 1000
+    const b = await api.createWorkflow({ ...linear, name: 'B' })
+    now = 2000
+    await api.updateWorkflow(a.id, { ...linear, name: 'A2' })
+    expect((await api.listWorkflows()).map((w) => w.name)).toEqual(['A2', 'B'])
+
+    await api.deleteWorkflow(b.id)
+    expect((await api.listWorkflows()).map((w) => w.name)).toEqual(['A2'])
+    await expect(api.getWorkflow(b.id)).rejects.toThrow(/nicht gefunden/)
+    await expect(api.deleteWorkflow(b.id)).rejects.toThrow(/nicht gefunden/)
+  })
+})

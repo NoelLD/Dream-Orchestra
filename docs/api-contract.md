@@ -18,8 +18,8 @@ Diese Datei fasst es zusammen und beschreibt, wie das Frontend es nutzt.
 | GET/POST | `/api/skills` | Skills (Felder wie Konzept §5; `description` darf leer sein) | `listSkills()`, `createSkill()` |
 | GET/PUT/DELETE | `/api/skills/{id}` | | `updateSkill()` |
 | POST | `/api/skills/import-simulation` | fehlende Skills des Simulationsdienstes anlegen | `importSimulationSkills()` → Knopf „Aus Simulation übernehmen“ |
-| GET/POST | `/api/workflows` | `{name, definition}` | `listWorkflows()`, `createWorkflow()` |
-| GET/PUT | `/api/workflows/{id}` | | `getWorkflow()`, `updateWorkflow()` |
+| GET/POST | `/api/workflows` | `{name, definition}`; Liste zuletzt geänderte zuerst | `listWorkflows()`, `createWorkflow()` → Dialog „Öffnen …“, „Speichern“, „Als Kopie“ |
+| GET/PUT/DELETE | `/api/workflows/{id}` | Laden, Speichern, Löschen (Läufe bleiben, ohne Zuordnung) | `getWorkflow()`, `updateWorkflow()`, `deleteWorkflow()` |
 | POST | `/api/workflows/validate` | Body = `definition`; `{valid, errors: [{block_id, message}], warnings, credits_estimate}` | `validateWorkflow()` → „Prüfen“ (2. Stufe) |
 | POST | `/api/runs` | `{workflow_id?, definition?}` → `202` mit vollständigem Lauf; `422` mit Prüfergebnis in `details`; `409` wenn schon ein Lauf aktiv | `startRun()`; 422-Fehler werden am Block markiert |
 | GET | `/api/runs` | letzte Läufe | – |

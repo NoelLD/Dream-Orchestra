@@ -3,7 +3,8 @@ import { create } from 'zustand'
 import type { NodeDataOf, Run, WorkflowDocument, WorkflowNodeType } from '@/api/contract'
 import { BLOCKS } from './blocks'
 import { EDGE_DEFAULTS, fromDocument, toDocument, type FlowEdge, type FlowNode } from './flow'
-import { SAMPLE_WORKFLOW } from './sample'
+import { serializeWorkflow } from './io'
+import { EMPTY_WORKFLOW, SAMPLE_WORKFLOW } from './sample'
 import type { ValidationIssue } from './validate'
 
 let idCounter = 0
@@ -26,14 +27,29 @@ type EditorState = {
   select: (id: string | null) => void
   setName: (name: string) => void
   setIssues: (issues: ValidationIssue[]) => void
+  /** Stand beim letzten Laden/Speichern (serialisiert) – Grundlage für „ungespeicherte Änderungen“ */
+  savedJson: string
   load: (doc: WorkflowDocument, workflowId?: string | null) => void
+  /** Nach erfolgreichem Speichern: ID übernehmen, aktuellen Stand als gespeichert merken */
+  markSaved: (workflowId: string) => void
+  /** Neuer, leerer Workflow (Start → Ende), noch nicht gespeichert */
+  newWorkflow: () => void
+  /** Zuordnung lösen (z. B. nachdem der geöffnete Workflow gelöscht wurde); Inhalt bleibt */
+  detach: () => void
   toDocument: () => WorkflowDocument
 }
 
+/** Editorzustand eines Dokuments inkl. Vergleichsstand (Roundtrip über toDocument, damit „unverändert“ exakt ist). */
+function loaded(doc: WorkflowDocument, workflowId: string | null) {
+  const flow = fromDocument(doc)
+  return { ...flow, name: doc.name, workflowId, savedJson: serializeWorkflow(toDocument(doc.name, flow.nodes, flow.edges)) }
+}
+
+export const selectIsDirty = (s: Pick<EditorState, 'toDocument' | 'savedJson'>) =>
+  serializeWorkflow(s.toDocument()) !== s.savedJson
+
 export const useEditor = create<EditorState>()((set, get) => ({
-  ...fromDocument(SAMPLE_WORKFLOW),
-  name: SAMPLE_WORKFLOW.name,
-  workflowId: null,
+  ...loaded(SAMPLE_WORKFLOW, null),
   selectedNodeId: null,
   issues: [],
 
@@ -65,7 +81,10 @@ export const useEditor = create<EditorState>()((set, get) => ({
   select: (id) => set({ selectedNodeId: id }),
   setName: (name) => set({ name }),
   setIssues: (issues) => set({ issues }),
-  load: (doc, workflowId = null) => set({ ...fromDocument(doc), name: doc.name, workflowId, selectedNodeId: null, issues: [] }),
+  load: (doc, workflowId = null) => set({ ...loaded(doc, workflowId), selectedNodeId: null, issues: [] }),
+  markSaved: (workflowId) => set({ workflowId, savedJson: serializeWorkflow(get().toDocument()) }),
+  newWorkflow: () => set({ ...loaded(EMPTY_WORKFLOW, null), selectedNodeId: null, issues: [] }),
+  detach: () => set({ workflowId: null, savedJson: '' }),
   toDocument: () => toDocument(get().name, get().nodes, get().edges),
 }))
 

@@ -106,4 +106,11 @@ describe('realer API-Client', () => {
       creditsEstimate: 1,
     })
   })
+
+  it('löscht Workflows über DELETE /api/workflows/{id} (204 ohne Inhalt)', async () => {
+    const f = fakeFetch(() => new Response(null, { status: 204 }))
+    await expect(createRealClient(f.fn).deleteWorkflow('9')).resolves.toBeUndefined()
+    expect(f.calls[0]?.url).toBe('/api/workflows/9')
+    expect(f.calls[0]?.init?.method).toBe('DELETE')
+  })
 })

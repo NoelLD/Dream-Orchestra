@@ -117,6 +117,7 @@ export function createRealClient(fetchFn: typeof fetch = (...args) => fetch(...a
     getWorkflow: (workflowId) => workflow('GET', `/workflows/${id(workflowId)}`),
     createWorkflow: (doc) => workflow('POST', '/workflows', workflowBody(doc)),
     updateWorkflow: (workflowId, doc) => workflow('PUT', `/workflows/${id(workflowId)}`, workflowBody(doc)),
+    deleteWorkflow: (workflowId) => request(z.undefined(), 'DELETE', `/workflows/${id(workflowId)}`),
 
     startRun: (req) =>
       run('POST', '/runs', { workflow_id: toBackendWorkflowId(req.workflowId), definition: toBackendDefinition(req.workflow) }),

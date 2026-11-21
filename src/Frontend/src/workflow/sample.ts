@@ -44,3 +44,14 @@ export const SAMPLE_WORKFLOW: WorkflowDocument = {
     { id: 'e-stoerung-abbruch', source: 'stoerung', target: 'abbruch', sourceHandle: 'out' },
   ],
 }
+
+/** Ausgangspunkt für „Neu“: Start → Ende (gültig, sofort lauffähig). */
+export const EMPTY_WORKFLOW: WorkflowDocument = {
+  schemaVersion: 1,
+  name: 'Neuer Workflow',
+  nodes: [
+    { id: 'start', type: 'start', position: { x: 0, y: 40 }, data: {} },
+    { id: 'ende', type: 'end', position: { x: 320, y: 40 }, data: {} },
+  ],
+  edges: [{ id: 'e-start-ende', source: 'start', target: 'ende', sourceHandle: 'out' }],
+}

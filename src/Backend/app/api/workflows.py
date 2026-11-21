@@ -9,7 +9,7 @@ from app.schemas.workflow import ValidationResult, WorkflowDefinition, WorkflowI
 router = APIRouter(prefix="/workflows", tags=["Workflows"])
 
 
-@router.get("", response_model=list[WorkflowSummary])
+@router.get("", response_model=list[WorkflowSummary], summary="Gespeicherte Workflows, zuletzt geänderte zuerst")
 def list_workflows(services: Svc) -> list[dict[str, Any]]:
     return repo.list_workflows(services.db)
 
@@ -34,3 +34,12 @@ def get_workflow(services: Svc, workflow_id: int) -> dict[str, Any]:
 @router.put("/{workflow_id}", response_model=WorkflowOut)
 def update_workflow(services: Svc, workflow_id: int, data: WorkflowIn) -> dict[str, Any]:
     return repo.update_workflow(services.db, workflow_id, data.name, data.definition.model_dump(mode="json"))
+
+
+@router.delete(
+    "/{workflow_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Workflow löschen (Läufe bleiben erhalten, ohne Zuordnung)",
+)
+def delete_workflow(services: Svc, workflow_id: int) -> None:
+    repo.delete_workflow(services.db, workflow_id)

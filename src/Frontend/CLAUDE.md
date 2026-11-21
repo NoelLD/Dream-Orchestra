@@ -15,7 +15,8 @@ Visueller Workflow-Editor für Dream-1-Abläufe mit virtuellen Sensoren und Akto
 src/api/        contract.ts (Editor-Format), backendMapping.ts (Editor <-> Backend-Vertrag), realClient.ts,
                 mockClient.ts, mode.ts, client.ts, useBackendStatus.ts (Banner nach Backend-Modus)
 src/workflow/   blocks.ts, store.ts (Editor + Laufzustand), flow.ts (Editor <-> JSON), io.ts (Import/Export),
-                validate.ts (F4), estimate.ts (F15), sample.ts, components/ (Canvas, BlockNode, SmartEdge, Palette, Toolbar, PropertiesPanel)
+                validate.ts (F4), estimate.ts (F15), sample.ts (Beispiel + leerer Workflow),
+                components/ (Canvas, BlockNode, SmartEdge, Palette, Toolbar, PropertiesPanel, WorkflowsDialog)
 src/run/        useRun.ts (Polling, Start/Stopp/Pause), RunLog.tsx, labels.ts
 src/devices/    DeviceBar.tsx
 src/skills/     SkillsView.tsx

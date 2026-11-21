@@ -1,6 +1,6 @@
-import { useMutation } from '@tanstack/react-query'
-import { CheckCircle2, Download, FileUp, Pause, Play, RotateCcw, Save, StepForward } from 'lucide-react'
-import { useMemo, useRef } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { CheckCircle2, Copy, Download, FilePlus, FileUp, FolderOpen, Pause, Play, RotateCcw, Save, StepForward } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
 import type { WorkflowDocument } from '@/api/contract'
@@ -8,13 +8,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
+import { cn } from '@/lib/utils'
 import { isRunActive, useRunAction, useStartRun } from '@/run/useRun'
 import { estimateCredits } from '../estimate'
 import { toDocument } from '../flow'
 import { parseWorkflowJson, serializeWorkflow } from '../io'
 import { SAMPLE_WORKFLOW } from '../sample'
-import { POLL_INTERVAL_OPTIONS, useEditor, useRunStore } from '../store'
+import { POLL_INTERVAL_OPTIONS, selectIsDirty, useEditor, useRunStore } from '../store'
 import { validateWorkflow } from '../validate'
+import { WorkflowsDialog } from './WorkflowsDialog'
 
 function download(filename: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
@@ -33,6 +36,12 @@ export function Toolbar() {
   const setIssues = useEditor((s) => s.setIssues)
   const load = useEditor((s) => s.load)
   const workflowId = useEditor((s) => s.workflowId)
+  const newWorkflow = useEditor((s) => s.newWorkflow)
+  const dirty = useEditor(selectIsDirty)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const queryClient = useQueryClient()
+  const confirmDiscard = () =>
+    !selectIsDirty(useEditor.getState()) || window.confirm('Ungespeicherte Änderungen verwerfen?')
   const run = useRunStore((s) => s.run)
   const pollIntervalMs = useRunStore((s) => s.pollIntervalMs)
   const setPollInterval = useRunStore((s) => s.setPollInterval)
@@ -72,8 +81,23 @@ export function Toolbar() {
       return workflowId ? api.updateWorkflow(workflowId, doc) : api.createWorkflow(doc)
     },
     onSuccess: (wf) => {
-      useEditor.setState({ workflowId: wf.id })
-      toast.success(`Workflow gespeichert (${wf.id})`)
+      useEditor.getState().markSaved(wf.id)
+      void queryClient.invalidateQueries({ queryKey: ['workflows'] })
+      toast.success(`Workflow „${wf.name}“ gespeichert`)
+    },
+    onError: (e) => toast.error(`Speichern fehlgeschlagen: ${e.message}`),
+  })
+
+  const saveCopy = useMutation({
+    mutationFn: () => {
+      const doc = useEditor.getState().toDocument()
+      return api.createWorkflow({ ...doc, name: `${doc.name} (Kopie)` })
+    },
+    onSuccess: (wf) => {
+      setName(wf.name)
+      useEditor.getState().markSaved(wf.id)
+      void queryClient.invalidateQueries({ queryKey: ['workflows'] })
+      toast.success(`Als „${wf.name}“ gespeichert`)
     },
     onError: (e) => toast.error(`Speichern fehlgeschlagen: ${e.message}`),
   })
@@ -85,8 +109,9 @@ export function Toolbar() {
       toast.error('Import fehlgeschlagen', { description: result.error, duration: 10_000 })
       return
     }
+    if (!confirmDiscard()) return
     load(result.workflow)
-    toast.success(`Workflow „${result.workflow.name}“ importiert`)
+    toast.success(`Workflow „${result.workflow.name}“ importiert – noch nicht gespeichert`)
   }
 
   return (
@@ -95,6 +120,30 @@ export function Toolbar() {
         Name des Workflows
       </Label>
       <Input id="wf-name" value={name} onChange={(e) => setName(e.target.value)} className="h-8 w-48" />
+      <span
+        data-testid="save-state"
+        className={cn(
+          'rounded px-1.5 py-0.5 text-[11px] font-medium',
+          workflowId === null || dirty ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-900',
+        )}
+      >
+        {workflowId === null ? 'neu · nicht gespeichert' : dirty ? '● ungespeichert' : 'gespeichert'}
+      </span>
+
+      <Button size="sm" variant="outline" disabled={active} onClick={() => confirmDiscard() && newWorkflow()}>
+        <FilePlus aria-hidden /> Neu
+      </Button>
+      <Button size="sm" variant="outline" onClick={() => setDialogOpen(true)}>
+        <FolderOpen aria-hidden /> Öffnen …
+      </Button>
+      <Button size="sm" variant="outline" onClick={() => save.mutate()} disabled={save.isPending}>
+        <Save aria-hidden /> Speichern
+      </Button>
+      <Button size="sm" variant="outline" onClick={() => saveCopy.mutate()} disabled={saveCopy.isPending}>
+        <Copy aria-hidden /> Als Kopie
+      </Button>
+      <WorkflowsDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <Separator orientation="vertical" className="mx-1 h-6" />
 
       <Button size="sm" variant="outline" disabled={remoteCheck.isPending} onClick={() => {
         const { doc, result } = check()
@@ -123,10 +172,7 @@ export function Toolbar() {
           e.target.value = ''
         }}
       />
-      <Button size="sm" variant="outline" onClick={() => save.mutate()} disabled={save.isPending}>
-        <Save aria-hidden /> Speichern
-      </Button>
-      <Button size="sm" variant="ghost" onClick={() => load(SAMPLE_WORKFLOW)} disabled={active}>
+      <Button size="sm" variant="ghost" onClick={() => confirmDiscard() && load(SAMPLE_WORKFLOW)} disabled={active}>
         <RotateCcw aria-hidden /> Beispiel laden
       </Button>
 

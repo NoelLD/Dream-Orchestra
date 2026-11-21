@@ -77,7 +77,8 @@ def _workflow(row: sqlite3.Row | None, workflow_id: int) -> dict[str, Any]:
 
 def list_workflows(db: Database) -> list[dict[str, Any]]:
     with db.connect() as conn:
-        return [dict(r) for r in conn.execute("SELECT id, name, created_at, updated_at FROM workflows ORDER BY id")]
+        rows = conn.execute("SELECT id, name, created_at, updated_at FROM workflows ORDER BY updated_at DESC, id DESC")
+        return [dict(r) for r in rows]
 
 
 def get_workflow(db: Database, workflow_id: int) -> dict[str, Any]:
@@ -104,6 +105,13 @@ def update_workflow(db: Database, workflow_id: int, name: str, definition: dict[
     if cur.rowcount == 0:
         raise NotFoundError(f"Workflow {workflow_id} nicht gefunden")
     return get_workflow(db, workflow_id)
+
+
+def delete_workflow(db: Database, workflow_id: int) -> None:
+    """Löscht den Workflow; seine Läufe bleiben erhalten (runs.workflow_id wird NULL)."""
+    with db.connect() as conn:
+        if conn.execute("DELETE FROM workflows WHERE id = ?", (workflow_id,)).rowcount == 0:
+            raise NotFoundError(f"Workflow {workflow_id} nicht gefunden")
 
 
 # --- Läufe und Protokoll -----------------------------------------------------

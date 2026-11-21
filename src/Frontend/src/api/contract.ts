@@ -263,6 +263,8 @@ export interface ApiClient {
   getWorkflow(id: string): Promise<Workflow>
   createWorkflow(doc: WorkflowDocument): Promise<Workflow>
   updateWorkflow(id: string, doc: WorkflowDocument): Promise<Workflow>
+  /** Läufe des Workflows bleiben im Backend erhalten (ohne Zuordnung). */
+  deleteWorkflow(id: string): Promise<void>
 
   startRun(request: StartRunRequest): Promise<Run>
   getRun(id: string): Promise<Run>

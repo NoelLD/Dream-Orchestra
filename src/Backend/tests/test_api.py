@@ -201,3 +201,18 @@ def test_import_simulation_skills(client: TestClient, monkeypatch: pytest.Monkey
     skills = {s["name"]: s for s in client.post("/api/skills/import-simulation").json()}
     assert skills["pick-banana"]["description"] == "schon da"  # vorhandene bleiben unverändert
     assert skills["pick-apple"]["fine_tuned_model"] == "dream-1-ft:ab-c"
+
+
+def test_multiple_workflows_list_update_delete(client: TestClient) -> None:
+    first = client.post("/api/workflows", json={"name": "Erster", "definition": SNAPSHOT}).json()
+    second = client.post("/api/workflows", json={"name": "Zweiter", "definition": SNAPSHOT}).json()
+    client.put(f"/api/workflows/{first['id']}", json={"name": "Erster (neu)", "definition": SNAPSHOT})
+    assert [w["name"] for w in client.get("/api/workflows").json()] == ["Erster (neu)", "Zweiter"]
+
+    run = client.post("/api/runs", json={"workflow_id": second["id"]}).json()
+    wait_for(lambda: client.get(f"/api/runs/{run['id']}").json(), lambda r: r["status"] != "running")
+    assert client.delete(f"/api/workflows/{second['id']}").status_code == 204
+    assert client.get(f"/api/workflows/{second['id']}").status_code == 404
+    assert client.delete(f"/api/workflows/{second['id']}").status_code == 404
+    assert client.get(f"/api/runs/{run['id']}").json()["workflow_id"] is None  # Lauf bleibt erhalten
+    assert [w["name"] for w in client.get("/api/workflows").json()] == ["Erster (neu)"]

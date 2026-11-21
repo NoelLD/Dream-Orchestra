@@ -317,7 +317,15 @@ export function createMockClient(options: MockOptions = {}): ApiClient {
       return clone(skill)
     },
 
-    listWorkflows: async () => [...workflows.values()].map(({ id, name, updated_at }) => ({ id, name, updated_at })),
+    // wie das Backend: zuletzt geänderte zuerst
+    listWorkflows: async () =>
+      [...workflows.values()]
+        .reverse()
+        .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+        .map(({ id, name, updated_at }) => ({ id, name, updated_at })),
+    deleteWorkflow: async (id) => {
+      if (!workflows.delete(id)) throw new ApiError(`Workflow „${id}“ nicht gefunden.`, 404)
+    },
     getWorkflow: async (id) => {
       const wf = workflows.get(id)
       if (!wf) throw new ApiError(`Workflow „${id}“ nicht gefunden.`, 404)
