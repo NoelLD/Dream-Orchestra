@@ -9,6 +9,8 @@ import type {
   ApiClient,
   ComparisonOperator,
   Device,
+  DeviceConfig,
+  DeviceInput,
   DeviceValue,
   Run,
   RunLogEntry,
@@ -19,6 +21,7 @@ import type {
   WorkflowNode,
   SourceHandle,
 } from './contract'
+import { DEVICE_TYPE_KIND } from './contract'
 import { estimateCredits } from '@/workflow/estimate'
 import { validateWorkflow } from '@/workflow/validate'
 import { ApiError } from './realClient'
@@ -40,15 +43,31 @@ export const MOCK_SIMULATION_SKILLS: readonly SkillInput[] = [
   { name: 'apple-to-bowl', description: 'Put the apple into the bowl', fine_tuned_model: null },
 ]
 
+const VIRTUAL = { adapter: 'virtual', protocol: 'virtual', config: { protocol: 'virtual' }, simulated: true } as const
 export const DEFAULT_MOCK_DEVICES: readonly Device[] = [
-  { id: 'lichtschranke', name: 'Lichtschranke', kind: 'sensor', type: 'switch', adapter: 'virtual', value: false },
-  { id: 'taster', name: 'Taster „Start“', kind: 'sensor', type: 'button', adapter: 'virtual', value: false },
-  { id: 'weitere-objekte', name: 'Weitere Objekte', kind: 'sensor', type: 'switch', adapter: 'virtual', value: true },
-  { id: 'fuellstand', name: 'Füllstand Kiste', kind: 'sensor', type: 'number', adapter: 'virtual', value: 0, unit: 'Stk', min: 0, max: 10 },
-  { id: 'lampe', name: 'Signallampe grün', kind: 'actuator', type: 'lamp', adapter: 'virtual', value: false },
-  { id: 'lampe-rot', name: 'Signallampe rot', kind: 'actuator', type: 'lamp', adapter: 'virtual', value: false },
-  { id: 'foerderband', name: 'Förderband', kind: 'actuator', type: 'conveyor', adapter: 'virtual', value: false },
+  { id: 'lichtschranke', name: 'Lichtschranke', kind: 'sensor', type: 'switch', value: false, ...VIRTUAL },
+  { id: 'taster', name: 'Taster „Start“', kind: 'sensor', type: 'button', value: false, ...VIRTUAL },
+  { id: 'weitere-objekte', name: 'Weitere Objekte', kind: 'sensor', type: 'switch', value: true, ...VIRTUAL },
+  { id: 'fuellstand', name: 'Füllstand Kiste', kind: 'sensor', type: 'number', value: 0, unit: 'Stk', min: 0, max: 10, ...VIRTUAL },
+  { id: 'lampe', name: 'Signallampe grün', kind: 'actuator', type: 'lamp', value: false, ...VIRTUAL },
+  { id: 'lampe-rot', name: 'Signallampe rot', kind: 'actuator', type: 'lamp', value: false, ...VIRTUAL },
+  { id: 'foerderband', name: 'Förderband', kind: 'actuator', type: 'conveyor', value: false, ...VIRTUAL },
 ]
+
+const DEVICE_NODE_TYPES = new Set<WorkflowNode['type']>(['waitSensor', 'condition', 'setActuator'])
+
+/** ID aus dem Namen wie im Backend: Umlaute ersetzen, sonst nur a–z, 0–9 und Bindestrich. */
+export function slugify(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return slug || 'geraet'
+}
 
 type Cursor = { nodeId: string; enteredAt: number; attempt: number; attemptStartedAt: number; pendingSend: boolean }
 type RunState = { run: Run; doc: WorkflowDocument; cursor: Cursor | null; pausedAt: number | null; stepping: boolean }
@@ -86,6 +105,38 @@ export function createMockClient(options: MockOptions = {}): ApiClient {
   let nextSkillId = 1
   let nextWorkflowId = 1
   let nextRunId = 1
+
+  /** Passwörter getrennt halten – wie das Backend gibt der Mock sie nie zurück */
+  const passwords = new Map<string, string>()
+
+  function workflowsUsing(deviceId: string): { id: string; name: string }[] {
+    return [...workflows.values()]
+      .filter((wf) => wf.nodes.some((n) => DEVICE_NODE_TYPES.has(n.type) && 'deviceId' in n.data && n.data.deviceId === deviceId))
+      .map((wf) => ({ id: wf.id, name: wf.name }))
+  }
+
+  function toMockDevice(id: string, input: DeviceInput, old: Device | undefined): Device {
+    const { password, ...config } = { password: undefined, ...input.config } as DeviceConfig & { password?: string | null }
+    if (password) passwords.set(id, password)
+    else if (!old || old.protocol !== input.config.protocol) passwords.delete(id)
+    const publicConfig = input.config.protocol === 'virtual' ? config : { ...config, password_set: passwords.has(id) }
+    const number = input.type === 'number'
+    const keepValue = old !== undefined && old.type === input.type
+    return {
+      id,
+      name: input.name.trim(),
+      kind: DEVICE_TYPE_KIND[input.type],
+      type: input.type,
+      adapter: 'virtual',
+      value: keepValue ? old.value : number ? (input.min ?? 0) : false,
+      unit: number ? (input.unit ?? null) : null,
+      min: number ? (input.min ?? null) : null,
+      max: number ? (input.max ?? null) : null,
+      protocol: input.config.protocol,
+      config: publicConfig as DeviceConfig,
+      simulated: true,
+    }
+  }
 
   // ----------------------------------------------------------------- Läufe
   function log(state: RunState, t: number, entry: Omit<RunLogEntry, 'ts'>) {
@@ -419,6 +470,33 @@ export function createMockClient(options: MockOptions = {}): ApiClient {
       if (!device) throw new ApiError(`Gerät „${id}“ nicht gefunden.`, 404)
       device.value = value
       return clone(device)
+    },
+    createDevice: async (input) => {
+      const base = slugify(input.name)
+      let id = base
+      for (let n = 2; devices.has(id); n++) id = `${base}-${n}`
+      const device = toMockDevice(id, input, undefined)
+      devices.set(id, device)
+      return clone(device)
+    },
+    updateDevice: async (id, input) => {
+      const old = devices.get(id)
+      if (!old) throw new ApiError(`Gerät „${id}“ nicht gefunden.`, 404)
+      if (DEVICE_TYPE_KIND[input.type] !== old.kind && workflowsUsing(id).length > 0) {
+        throw new ApiError(`„${id}“ wird in Workflows als ${old.kind === 'sensor' ? 'Sensor' : 'Aktor'} verwendet; Art kann nicht wechseln.`, 409)
+      }
+      const device = toMockDevice(id, input, old)
+      devices.set(id, device)
+      return clone(device)
+    },
+    deleteDevice: async (id) => {
+      if (!devices.has(id)) throw new ApiError(`Gerät „${id}“ nicht gefunden.`, 404)
+      const using = workflowsUsing(id)
+      if (using.length > 0) {
+        throw new ApiError(`Gerät „${id}“ wird in Workflows verwendet: ${using.map((w) => `„${w.name}“`).join(', ')}`, 409, 'conflict', using)
+      }
+      devices.delete(id)
+      passwords.delete(id)
     },
   }
 }

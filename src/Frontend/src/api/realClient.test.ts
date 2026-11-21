@@ -33,6 +33,11 @@ const run = {
   cursor: 0,
 }
 
+const device = {
+  id: 'taster', name: 'Taster', kind: 'sensor', type: 'button', adapter: 'virtual', value: true,
+  protocol: 'mqtt', config: { protocol: 'mqtt', host: 'b', port: 1883, topic: 't', qos: 0, tls: false, password_set: false }, simulated: true,
+}
+
 describe('realer API-Client', () => {
   it('meldet den Modus "real"', () => {
     expect(createRealClient(fakeFetch(() => json({})).fn).mode).toBe('real')
@@ -46,12 +51,22 @@ describe('realer API-Client', () => {
     expect(result).toMatchObject({ id: '1', activeNodeId: 'n2', credits: { used: 1 } })
   })
 
-  it('schickt Gerätewerte als PUT mit JSON-Body', async () => {
-    const f = fakeFetch(() => json({ id: 'taster', name: 'Taster', kind: 'sensor', type: 'button', adapter: 'virtual', value: true }))
+  it('schickt Gerätewerte als PUT mit JSON-Body an /value', async () => {
+    const f = fakeFetch(() => json(device))
     await createRealClient(f.fn).setDevice('taster', true)
-    expect(f.calls[0]?.url).toBe('/api/devices/taster')
+    expect(f.calls[0]?.url).toBe('/api/devices/taster/value')
     expect(f.calls[0]?.init?.method).toBe('PUT')
     expect(JSON.parse(String(f.calls[0]?.init?.body))).toEqual({ value: true })
+  })
+
+  it('legt Geräte per POST an und löscht per DELETE', async () => {
+    const f = fakeFetch((call) => (call.init?.method === 'DELETE' ? new Response(null, { status: 204 }) : json(device, 201)))
+    const client = createRealClient(f.fn)
+    const created = await client.createDevice({ name: 'Taster', type: 'button', config: { protocol: 'virtual' } })
+    expect(created).toMatchObject({ id: 'taster', protocol: 'mqtt', simulated: true })
+    expect(f.calls[0]).toMatchObject({ url: '/api/devices', init: { method: 'POST' } })
+    await client.deleteDevice('x')
+    expect(f.calls[1]).toMatchObject({ url: '/api/devices/x', init: { method: 'DELETE' } })
   })
 
   it('lehnt Antworten ab, die nicht dem Vertrag entsprechen', async () => {

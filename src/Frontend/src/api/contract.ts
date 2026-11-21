@@ -192,11 +192,58 @@ export const StartRunRequestSchema = z.object({
 export type StartRunRequest = z.infer<typeof StartRunRequestSchema>
 
 // ---------------------------------------------------------------------------
-// Geräte (F10/F11) – für den Hackathon nur Adapter "virtual"
+// Geräte (F10/F11) – Stammdaten mit Protokoll (virtual, MQTT, OPC UA); Werte werden simuliert
 // ---------------------------------------------------------------------------
 export const DeviceKindSchema = z.enum(['sensor', 'actuator'])
+export type DeviceKind = z.infer<typeof DeviceKindSchema>
 export const DeviceTypeSchema = z.enum(['switch', 'button', 'number', 'lamp', 'conveyor'])
 export type DeviceType = z.infer<typeof DeviceTypeSchema>
+
+/** Welche Art ein Gerätetyp hat (wie im Backend: Lampe und Förderband sind Aktoren). */
+export const DEVICE_TYPE_KIND: Record<DeviceType, DeviceKind> = {
+  switch: 'sensor',
+  button: 'sensor',
+  number: 'sensor',
+  lamp: 'actuator',
+  conveyor: 'actuator',
+}
+export const DEVICE_TYPE_LABELS: Record<DeviceType, string> = {
+  switch: 'Schalter',
+  button: 'Taster',
+  number: 'Zahlenwert',
+  lamp: 'Lampe',
+  conveyor: 'Förderband',
+}
+
+export const DeviceProtocolSchema = z.enum(['virtual', 'mqtt', 'opcua'])
+export type DeviceProtocol = z.infer<typeof DeviceProtocolSchema>
+export const PROTOCOL_LABELS: Record<DeviceProtocol, string> = { virtual: 'virtuell', mqtt: 'MQTT', opcua: 'OPC UA' }
+
+const optionalText = z.string().nullable().optional()
+/** Passwort nur schreiben; Antworten enthalten stattdessen `password_set`. Leer beim Bearbeiten = unverändert. */
+const credentials = { username: optionalText, password: optionalText, password_set: z.boolean().optional() }
+
+export const DeviceConfigSchema = z.discriminatedUnion('protocol', [
+  z.object({ protocol: z.literal('virtual') }),
+  z.object({
+    protocol: z.literal('mqtt'),
+    host: z.string().trim().min(1, 'Host fehlt'),
+    port: z.number().int().min(1).max(65535),
+    topic: z.string().trim().min(1, 'Topic fehlt'),
+    qos: z.number().int().min(0).max(2),
+    tls: z.boolean(),
+    payload_path: optionalText,
+    ...credentials,
+  }),
+  z.object({
+    protocol: z.literal('opcua'),
+    endpoint: z.string().regex(/^opc\.tcp:\/\/.+/, 'Endpoint muss mit opc.tcp:// beginnen'),
+    node_id: z.string().trim().min(1, 'Node-ID fehlt'),
+    security_mode: z.enum(['None', 'Sign', 'SignAndEncrypt']),
+    ...credentials,
+  }),
+])
+export type DeviceConfig = z.infer<typeof DeviceConfigSchema>
 
 export const DeviceSchema = z.object({
   id: z.string().min(1),
@@ -208,8 +255,24 @@ export const DeviceSchema = z.object({
   unit: z.string().nullable().optional(),
   min: z.number().nullable().optional(),
   max: z.number().nullable().optional(),
+  protocol: DeviceProtocolSchema,
+  config: DeviceConfigSchema,
+  /** Werte werden simuliert (noch keine echte Verbindung) */
+  simulated: z.boolean(),
 })
 export type Device = z.infer<typeof DeviceSchema>
+
+export const DeviceInputSchema = z
+  .object({
+    name: z.string().trim().min(1, 'Name fehlt').max(100),
+    type: DeviceTypeSchema,
+    config: DeviceConfigSchema,
+    unit: z.string().nullable().optional(),
+    min: z.number().nullable().optional(),
+    max: z.number().nullable().optional(),
+  })
+  .refine((d) => d.min == null || d.max == null || d.min <= d.max, { message: 'Min darf nicht größer als Max sein' })
+export type DeviceInput = z.infer<typeof DeviceInputSchema>
 
 export const SetDeviceRequestSchema = z.object({ value: DeviceValueSchema })
 
@@ -275,5 +338,10 @@ export interface ApiClient {
   stepRun(id: string): Promise<Run>
 
   listDevices(): Promise<Device[]>
+  /** Sensor bedienen (PUT /devices/{id}/value); Aktoren schaltet der Ablauf */
   setDevice(id: string, value: DeviceValue): Promise<Device>
+  createDevice(input: DeviceInput): Promise<Device>
+  updateDevice(id: string, input: DeviceInput): Promise<Device>
+  /** 409, solange ein gespeicherter Workflow das Gerät verwendet */
+  deleteDevice(id: string): Promise<void>
 }

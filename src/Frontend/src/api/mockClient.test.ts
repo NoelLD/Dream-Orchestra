@@ -225,3 +225,42 @@ describe('Mock-Client: mehrere Workflows', () => {
     await expect(api.deleteWorkflow(b.id)).rejects.toThrow(/nicht gefunden/)
   })
 })
+
+describe('Mock-Client: Geräte verwalten', () => {
+  const mqtt = { protocol: 'mqtt', host: 'b', topic: 't', port: 1883, qos: 0, tls: false, password: 'p' } as const
+
+  it('legt Geräte mit ID aus dem Namen an und gibt kein Passwort zurück', async () => {
+    const band = await api.createDevice({ name: 'Band', type: 'conveyor', config: mqtt })
+    expect(band).toMatchObject({ id: 'band', kind: 'actuator', protocol: 'mqtt', simulated: true, value: false })
+    expect(band.config).not.toHaveProperty('password')
+    expect(band.config).toMatchObject({ password_set: true })
+    expect((await api.createDevice({ name: 'Band', type: 'conveyor', config: mqtt })).id).toBe('band-2')
+    expect((await api.listDevices()).map((d) => d.id)).toContain('band-2')
+  })
+
+  it('setzt beim Typwechsel den Wert zurück und behält leeres Passwort', async () => {
+    await api.createDevice({ name: 'Band', type: 'conveyor', config: mqtt })
+    const updated = await api.updateDevice('band', { name: 'Band', type: 'conveyor', config: { ...mqtt, password: null } })
+    expect(updated.config).toMatchObject({ password_set: true })
+    await api.setDevice('fuellstand', 4)
+    const sw = await api.updateDevice('fuellstand', { name: 'Füllstand', type: 'switch', config: { protocol: 'virtual' } })
+    expect(sw).toMatchObject({ id: 'fuellstand', value: false, kind: 'sensor' })
+  })
+
+  it('blockiert das Löschen, solange ein gespeicherter Workflow das Gerät nutzt', async () => {
+    await api.createWorkflow(
+      doc(
+        [
+          { id: 's', type: 'start', position: P, data: {} },
+          { id: 'a', type: 'setActuator', position: P, data: { deviceId: 'lampe', value: true } },
+        ],
+        [],
+      ),
+    )
+    const error = await api.deleteDevice('lampe').catch((e: unknown) => e)
+    expect(error).toMatchObject({ status: 409 })
+    expect((error as Error).message).toContain('Test')
+    await api.deleteDevice('taster')
+    expect((await api.listDevices()).map((d) => d.id)).not.toContain('taster')
+  })
+})

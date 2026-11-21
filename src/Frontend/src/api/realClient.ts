@@ -128,6 +128,9 @@ export function createRealClient(fetchFn: typeof fetch = (...args) => fetch(...a
     stepRun: (runId) => run('POST', `/runs/${id(runId)}/step`),
 
     listDevices: () => request(z.array(DeviceSchema), 'GET', '/devices'),
-    setDevice: (deviceId, value) => request(DeviceSchema, 'PUT', `/devices/${id(deviceId)}`, { value }),
+    setDevice: (deviceId, value) => request(DeviceSchema, 'PUT', `/devices/${id(deviceId)}/value`, { value }),
+    createDevice: (input) => request(DeviceSchema, 'POST', '/devices', input),
+    updateDevice: (deviceId, input) => request(DeviceSchema, 'PUT', `/devices/${id(deviceId)}`, input),
+    deleteDevice: (deviceId) => request(z.undefined(), 'DELETE', `/devices/${id(deviceId)}`),
   }
 }
