@@ -33,8 +33,8 @@ test('Produktions-Build: Pick-and-Place-Lauf über das Backend (Schleife, Erfolg
   test.skip(status.api_mode !== 'mock', 'nur mit Backend im Modus mock (keine Simulation, keine Credits)')
 
   // Startzustand der virtuellen Geräte im Backend setzen
-  await page.request.put('/api/devices/lichtschranke', { data: { value: false } })
-  await page.request.put('/api/devices/weitere-objekte', { data: { value: true } })
+  await page.request.put('/api/devices/lichtschranke/value', { data: { value: false } })
+  await page.request.put('/api/devices/weitere-objekte/value', { data: { value: true } })
 
   await page.goto('/')
   await page.getByRole('button', { name: 'Lauf starten' }).click()
