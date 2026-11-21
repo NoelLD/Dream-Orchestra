@@ -20,7 +20,7 @@ class FakeDreamClient:
         self._runs: dict[str, dict[str, Any]] = {}
         self.stopped: list[str] = []
 
-    async def start(self, *, skill: str, prompt: str, checkpoint: str | None) -> str:
+    async def start(self, *, skill: str, prompt: str, checkpoint: str | None, timeout_s: float | None = None) -> str:
         if "#down" in prompt:
             raise DreamError("Simulierter Ausfall: Dienst nicht erreichbar")
         run_id = f"fake_{next(self._ids)}"

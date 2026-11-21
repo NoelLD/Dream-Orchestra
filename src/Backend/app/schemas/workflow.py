@@ -79,7 +79,13 @@ class PromptParams(BaseModel):
     skill_id: int
     prompt: str = Field(min_length=1)
     checkpoint: str | None = Field(default=None, description="Sonst fine_tuned_model des Skills bzw. Basismodell")
-    timeout_s: float | None = Field(default=None, gt=0, description="Zeitlimit pro Versuch (F6)")
+    timeout_s: float | None = Field(default=None, gt=0, description="Harte Wanduhr-Grenze pro Versuch (F6)")
+    sim_timeout_s: float | None = Field(
+        default=None,
+        ge=5,
+        le=600,
+        description="Zeitlimit des Simulationsdienstes in simulierten Sekunden (Standard 60)",
+    )
     retries: int = Field(default=0, ge=0, le=10, description="Wiederholungen bei Fehlschlag (F9)")
 
 

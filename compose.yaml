@@ -21,6 +21,8 @@ services:
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "app"]
     environment:
       WATCHFILES_FORCE_POLLING: "true"
+      # mock (Standard) | sim | real; überschreibbar: DREAM_API_MODE=sim docker compose up backend
+      DREAM_API_MODE: ${DREAM_API_MODE:-mock}
     volumes:
       - ./src/Backend:/app:ro
       - ./src/Backend/data:/app/data

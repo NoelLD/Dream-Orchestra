@@ -22,6 +22,9 @@ Alle Fach-Endpunkte liegen unter `/api`. Fehler: `{"error": "<code>", "detail": 
 | PUT | `/api/devices/{id}` | `{value}`; nur Sensoren (`409` bei Aktoren) |
 | GET/POST | `/api/training/datasets`, `GET /api/training/datasets/{name}`, `POST …/{name}/upload` | Durchgriff auf den Simulationsdienst |
 | GET/POST | `/api/training/finetune`, `GET /api/training/finetune/{job_id}` | Fine-Tuning (kostet Credits, `confirm_cost_usd`) |
+| GET | `/api/simulation/skills` | Skills des Simulationsdienstes (gültige Skill-Namen) |
+| GET | `/api/simulation/runs/{run_id}` | Details eines Simulationslaufs (`success_detail`, `duration_s`, `cost_usd`); `run_…` steht im Protokoll |
+| GET | `/api/simulation/runs/{run_id}/video`, `/api/simulation/frame.jpg` | MP4 nach Laufende, Livebild (F16) |
 
 ## Workflow-JSON
 
@@ -29,7 +32,7 @@ Alle Fach-Endpunkte liegen unter `/api`. Fehler: `{"error": "<code>", "detail": 
 {
   "blocks": [
     {"id": "start", "type": "start", "position": {"x": 0, "y": 0}},
-    {"id": "grab", "type": "prompt", "params": {"skill_id": 1, "prompt": "pick up the banana", "timeout_s": 120, "retries": 1}},
+    {"id": "grab", "type": "prompt", "params": {"skill_id": 1, "prompt": "pick up the banana", "sim_timeout_s": 60, "timeout_s": 600, "retries": 1}},
     {"id": "wait", "type": "wait_sensor", "params": {"device": "lichtschranke", "operator": "==", "value": true, "timeout_s": 30}},
     {"id": "lamp", "type": "set_actuator", "params": {"device": "lampe", "value": true}},
     {"id": "pause", "type": "wait_time", "params": {"seconds": 2}},
@@ -62,5 +65,7 @@ Alle Fach-Endpunkte liegen unter `/api`. Fehler: `{"error": "<code>", "detail": 
    Credits). `mock` (Standard) braucht keinen Simulationsdienst.
 2. Der „echte“ Dream-Client spricht mit dem Simulationsdienst statt direkt mit der SDK, weil die SDK keinen Lauf mit
    Status kennt (siehe `src/Backend/docs/dream-sdk.md`).
-3. Zusätzlich: `GET /api/runs`, `/api/health` und die `/api/training/...`-Endpunkte.
+3. Zusätzlich: `GET /api/runs`, `/api/health`, `/api/training/...` und `/api/simulation/...`.
 4. Workflows haben (noch) kein `DELETE`.
+5. Prompt-Block: `sim_timeout_s` (5–600 simulierte Sekunden, Standard 60) ist das erfolgsbewusste Zeitlimit des
+   Simulationsdienstes; `timeout_s` (Standard 600) ist nur die harte Wanduhr-Grenze im Backend.

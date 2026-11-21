@@ -8,7 +8,7 @@ app/
   config.py       Settings aus der Umgebung
   errors.py       AppError & Co. (ohne FastAPI)
   runs.py         RunRegistry – einziger globaler Zustand, Läufe als asyncio-Tasks
-  api/            Router: health, skills, workflows, runs, devices, training
+  api/            Router: health, skills, workflows, runs, devices, training, simulation
   schemas/        Pydantic: workflow.py (Workflow-JSON, Parameter), models.py (Skill, Run, Device, Status)
   engine/         engine.py (Zustandsmaschine), validation.py (F4/F15) – rein, ohne FastAPI
   dream/          client.py (Protokoll), fake.py (FakeDreamClient), simulation.py (HTTP zum Simulationsdienst)
@@ -41,6 +41,10 @@ In Git Bash vor Befehlen mit `-w /work` `MSYS_NO_PATHCONV=1` setzen.
   `#hang`, `#down` erzeugen Fehlerfälle.
 - `sim`: Simulationsdienst, geskripteter Ablauf, keine Credits.
 - `real`: Simulationsdienst mit Dream-1 – **kostet Credits**, nur nach Freigabe.
+
+Umschalten ohne `.env`-Änderung: `DREAM_API_MODE=sim docker compose up -d backend`. Für `sim`/`real` muss der Dienst
+`simulation` laufen (`docker compose up -d simulation`). Nach einem Stopp schreibt er noch das Video und antwortet
+`409 busy`; `SimulationDreamClient.start` wartet darauf bis zu 30 s.
 
 `GET /api/status` meldet Modus, Banner und Probleme (z. B. fehlender Key).
 

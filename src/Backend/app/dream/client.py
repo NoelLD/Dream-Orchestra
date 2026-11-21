@@ -15,9 +15,10 @@ TERMINAL = frozenset({"succeeded", "failed", "timeout", "stopped", "error"})
 @dataclass(frozen=True)
 class DreamRun:
     run_id: str
-    status: str  # queued | warming | running | finalizing | succeeded | failed | timeout | stopped | error
+    status: str  # queued | warming | running | stopping | finalizing | succeeded | failed | timeout | stopped | error
     success: bool | None = None
     api_calls: int = 0
+    cost_usd: float = 0.0
     error: str | None = None
 
     @property
@@ -32,8 +33,8 @@ class DreamError(Exception):
 class DreamClient(Protocol):
     mode: str
 
-    async def start(self, *, skill: str, prompt: str, checkpoint: str | None) -> str:
-        """Startet einen Skill-Lauf und gibt dessen ID zurück."""
+    async def start(self, *, skill: str, prompt: str, checkpoint: str | None, timeout_s: float | None = None) -> str:
+        """Startet einen Skill-Lauf und gibt dessen ID zurück. `timeout_s`: simulierte Sekunden (Simulationsdienst)."""
         ...
 
     async def status(self, run_id: str) -> DreamRun: ...

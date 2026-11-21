@@ -35,7 +35,7 @@ from app.schemas.workflow import (
 class EngineSettings:
     poll_interval_s: float = 1.0
     sensor_poll_interval_s: float = 0.2
-    default_block_timeout_s: float = 180.0
+    default_block_timeout_s: float = 600.0
     max_steps: int = 1000
 
 
@@ -219,9 +219,12 @@ class Engine:
             started = time.monotonic()
             self.sink.credits_used(1)
             try:
-                run = await asyncio.wait_for(self._run_skill(skill.name, params.prompt, checkpoint), timeout)
+                run = await asyncio.wait_for(
+                    self._run_skill(skill.name, params.prompt, checkpoint, params.sim_timeout_s), timeout
+                )
                 status, ok = run.status, run.status == "succeeded"
-                detail = f"{run.api_calls} API-Aufrufe" + (f", {run.error}" if run.error else "")
+                detail = f"{run.run_id}: {run.status}, {run.api_calls} API-Aufrufe, {run.cost_usd:.4f} $"
+                detail += f", {run.error}" if run.error else ""
             except TimeoutError:
                 await self._stop_dream_run()
                 status, ok, detail = "timeout", False, f"Zeitlimit {timeout:g} s überschritten"
@@ -238,8 +241,12 @@ class Engine:
                 return Port.NEXT
         raise BlockError(f"Skill '{skill.name}' nach {attempts} Versuch(en) nicht erfolgreich")
 
-    async def _run_skill(self, skill: str, prompt: str, checkpoint: str | None) -> DreamRun:
-        self._dream_run = await self.dream.start(skill=skill, prompt=prompt, checkpoint=checkpoint)
+    async def _run_skill(
+        self, skill: str, prompt: str, checkpoint: str | None, sim_timeout_s: float | None
+    ) -> DreamRun:
+        self._dream_run = await self.dream.start(
+            skill=skill, prompt=prompt, checkpoint=checkpoint, timeout_s=sim_timeout_s
+        )
         try:
             while True:
                 await asyncio.sleep(self.settings.poll_interval_s)  # N5

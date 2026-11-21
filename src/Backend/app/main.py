@@ -8,7 +8,7 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import devices, health, runs, skills, training, workflows
+from app.api import devices, health, runs, simulation, skills, training, workflows
 from app.api.deps import Services
 from app.config import Settings, get_settings
 from app.db import repo
@@ -26,13 +26,13 @@ logger = logging.getLogger(__name__)
 
 
 def build_services(settings: Settings) -> Services:
-    simulation = SimulationApi(settings.simulation_url, settings.simulation_timeout_s)
+    sim_api = SimulationApi(settings.simulation_url, settings.simulation_timeout_s)
     dream: DreamClient
     if settings.dream_api_mode == "mock":
         dream = FakeDreamClient(settings.fake_run_duration_s)
     else:
         sim_mode = "dream" if settings.dream_api_mode == "real" else "mock"
-        dream = SimulationDreamClient(simulation, sim_mode=sim_mode, label=settings.dream_api_mode)
+        dream = SimulationDreamClient(sim_api, sim_mode=sim_mode, label=settings.dream_api_mode)
     db = Database(settings.database_path)
     devices = VirtualAdapter()
     registry = RunRegistry(
@@ -46,7 +46,7 @@ def build_services(settings: Settings) -> Services:
             max_steps=settings.max_steps_per_run,
         ),
     )
-    return Services(settings=settings, db=db, dream=dream, devices=devices, simulation=simulation, runs=registry)
+    return Services(settings=settings, db=db, dream=dream, devices=devices, simulation=sim_api, runs=registry)
 
 
 def create_app(settings: Settings | None = None, factory: Callable[[Settings], Services] = build_services) -> FastAPI:
@@ -84,7 +84,7 @@ def create_app(settings: Settings | None = None, factory: Callable[[Settings], S
     app.include_router(health.root)
     api = APIRouter(prefix="/api")
     api.include_router(health.api)
-    for module in (skills, workflows, runs, devices, training):
+    for module in (skills, workflows, runs, devices, training, simulation):
         api.include_router(module.router)
     app.include_router(api)
     return app

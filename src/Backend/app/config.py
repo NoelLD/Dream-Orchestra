@@ -31,7 +31,8 @@ class Settings(BaseSettings):
 
     poll_interval_s: float = Field(default=1.0, gt=0)  # N5: Abstand der Statusabfragen
     sensor_poll_interval_s: float = Field(default=0.2, gt=0)
-    default_block_timeout_s: float = Field(default=180.0, gt=0)
+    # Harte Obergrenze; Erfolg und Zeitlimit misst der Simulationsdienst (inkl. Aufwärmphase des Modells)
+    default_block_timeout_s: float = Field(default=600.0, gt=0)
     max_steps_per_run: int = Field(default=1000, ge=1)  # Schutz gegen Endlosschleifen
     fake_run_duration_s: float = Field(default=3.0, ge=0)
 
