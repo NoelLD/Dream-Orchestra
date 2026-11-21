@@ -32,6 +32,7 @@ from yam_env import YamEnv  # noqa: E402
 FPS = 10
 KEEP_EVERY = 2  # 20 Hz control -> 10 fps
 from app.embodiment import CAMERAS, EMBODIMENT  # noqa: E402
+from app.render import SmallRenderer  # noqa: E402
 
 SKILLS = [  # (fruit, grasp yaw, task prompt); banana sits on the right arm's side, apple on the left's
     ("banana", np.pi / 2, "pick up the banana and put it back down"),
@@ -64,7 +65,8 @@ def randomized_reset(original, rng: np.random.Generator):
 class Recorder:
     """Collects one episode's frames by wrapping YamEnv.step."""
 
-    def __init__(self):
+    def __init__(self, small: bool = False):
+        self.small = small
         self.steps = 0
         self.states: list[np.ndarray] = []
         self.actions: list[np.ndarray] = []
@@ -78,7 +80,12 @@ class Recorder:
                 measured = env.state()
                 recorder.states.append(np.r_[measured["right"], measured["left"]].astype(np.float32))
                 recorder.actions.append(np.r_[np.asarray(right), np.asarray(left)].astype(np.float32))
-                frames = env.images()
+                if recorder.small:  # the run-time renderer (app/render.py): policies see what they trained on
+                    if getattr(env, "_small_renderer", None) is None:
+                        env._small_renderer = SmallRenderer(env.model, shadows=config.RENDER_SHADOWS)
+                    frames = env._small_renderer.views(env.data)
+                else:
+                    frames = env.images()
                 for role, cam in CAMERAS.items():
                     recorder.images[role].append(frames[cam])
             recorder.steps += 1
@@ -108,6 +115,7 @@ def main() -> int:
     parser.add_argument("--randomize", action="store_true", help="jitter fruit positions and light")
     parser.add_argument("--skill-offset", type=int, default=0, help="first SKILLS entry (for one-episode workers)")
     parser.add_argument("--no-validate", action="store_true", help="skip validate_dataset (validated after merge)")
+    parser.add_argument("--small", action="store_true", help="render 320x180 like the run time (policy datasets)")
     args = parser.parse_args()
     rng = np.random.default_rng(args.seed)
     if args.randomize:
@@ -124,7 +132,7 @@ def main() -> int:
     height = width = None
     episode_index = 0
     for attempt, (fruit, yaw, prompt) in enumerate(attempts):
-        recorder = Recorder()
+        recorder = Recorder(small=args.small)
         YamEnv.step = recorder.wrap(original_step)
         try:
             result = mock_pickups.run_trial(fruit, yaw=yaw)

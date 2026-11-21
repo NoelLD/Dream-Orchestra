@@ -1,6 +1,6 @@
 # Simulation-Dienst (`simulation`)
 
-> **API v0.2 (21.11.2026).** Beide Modi laufen. `mock`: 10 pytest-Tests grün. `dream`: am 21.11. gegen die echte API
+> **API v0.3 (21.11.2026).** Beide Modi laufen. `mock`: 14 pytest-Tests grün. `dream`: am 21.11. gegen die echte API
 > geprüft. `pick-banana` mit `dreamlabs/dream-1-beta` zero-shot `succeeded` (Banane 8,3 cm angehoben, 7 Aufrufe,
 > 34 s, ~0,01 $). Ein erster Lauf davor endete mit `timeout`. Einzelläufe sind keine Erfolgsquote.
 > Live-Doku der laufenden API: http://localhost:3001/docs
@@ -39,13 +39,15 @@ docker compose --profile gui up -d simulation-gui # optional: MuJoCo-Fenster im 
 | Pfad | Inhalt |
 |---|---|
 | `app/main.py` | FastAPI-Routen, Pydantic-Modelle, Fehlerformat |
-| `app/runner.py` | Lauf-Verwaltung: ein Lauf zur Zeit, Worker-Thread, Mock- und Dream-Schleife, Stopp, Zeitlimit, Video, Livebild |
+| `app/runner.py` | Lauf-Verwaltung: ein Lauf zur Zeit, Worker-Thread, Mock- und Dream-Schleife, Versuche, Budget, Stopp, Zeitlimit, Video, Livebild |
+| `app/evals.py` | Serienläufe mit gepaarten Seeds, Wilson-Intervalle, Kosten pro Erfolg |
+| `app/render.py` | Gemeinsamer Renderer für Läufe und Policy-Datasets (320×180) |
 | `app/skills.py` | Skills und ihre Erfolgsprüfung in der Simulation |
 | `app/training.py` | Datasets erzeugen, hochladen, Fine-Tune starten (Zustand in `data/training.json`) |
 | `app/embodiment.py` | YAM-Embodiment (14 Werte, rechter Arm zuerst, 3 Kameras) |
 | `app/config.py` | Pfade und Einstellungen (Umgebungsvariablen) |
 | `tools/` | Kommandozeilen-Werkzeuge, siehe unten |
-| `tests/test_api.py` | API-Tests im Modus `mock` |
+| `tests/test_api.py` | 14 API-Tests im Modus `mock` |
 | `Dockerfile` | Python 3.12, MuJoCo, Mesa-Rendering ohne GPU, noVNC. Das Dream-Labs-Beispiel `yam_mujoco` ist auf Commit `ba8ad98` gepinnt |
 
 Die Szene stammt aus dem Dream-Labs-Beispiel `dream_library/examples/yam_mujoco`: zwei YAM-Arme, Kameras `top`, `left` und `right`, Banane, Apfel, Orange, Flasche, Schale und Teller. Der geskriptete Greifablauf (`mock_pickups.run_trial`) nutzt IK und arbeitet ohne API-Aufrufe.
@@ -65,6 +67,10 @@ Die Szene stammt aus dem Dream-Labs-Beispiel `dream_library/examples/yam_mujoco`
 | `POST` | `/runs/{run_id}/stop` | Lauf abbrechen | F7 |
 | `GET` | `/runs/{run_id}/video` | MP4 des Laufs (sobald terminal) | F16 |
 | `GET` | `/frame.jpg` | Neuestes Kamerabild für eine Live-Kachel | F16 |
+| `GET` | `/budget` | Budget-Grenze, bisherige und verbleibende Ausgaben (Schätzung) | F15 |
+| `POST` | `/evals` | Serienläufe: Varianten (Prompt × Modell × Versuche) auf gleichen Testszenen | F15, Bewertung |
+| `GET` | `/evals`, `/evals/{eval_id}` | Fortschritt, Erfolgsquoten mit Wilson-Intervall, Kosten pro Erfolg | |
+| `POST` | `/evals/{eval_id}/stop` | Evaluation abbrechen | |
 | `GET` / `POST` | `/datasets` | Datasets auflisten / Demos erzeugen | Training |
 | `GET` | `/datasets/{name}` | Fortschritt, Validierung, Dream-Status | Training |
 | `POST` | `/datasets/{name}/upload` | Zu Dream Labs hochladen (kostenlos) | Training |
@@ -103,6 +109,9 @@ Jeder Eintrag hat `name`, `description`, `default_prompt`, `fine_tuned_model`, `
 | `timeout_s` | 5–600 | nein | **Simulierte** Sekunden, Standard 60. Bei `dream` zählt die Zeit ab der ersten Modellantwort. Zusätzlich gilt eine harte Wanduhr-Grenze von 10 × `timeout_s` |
 | `seed` | int | nein | Verschiebt Banane und Apfel reproduzierbar um bis zu ±3 cm. Fehlt er, wird gelost |
 | `record_video` | bool | nein | MP4 aufzeichnen (Standard `true`) |
+| `max_attempts` | 1–5 | nein | Versuche pro Lauf (Standard 1). Nach einem gescheiterten Versuch (Zeitlimit ohne Erfolg) setzt der Dienst neu an (F9) |
+| `recovery` | `"rehome"` \| `"continue"` | nein | Vor dem nächsten Versuch die Arme in 1 s in die Grundstellung fahren (Standard) oder direkt weitermachen. Jeder Versuch ist eine neue Dream-Episode |
+| `recovery_prompts` | string[] (≤ 4) | nein | Prompts für Versuch 2, 3, … Fehlt einer, gilt wieder `prompt` |
 
 Antwort `202`: `{"run_id": "run_7f3a9c12", "status": "queued", "mode": "mock"}`. Es läuft **ein Lauf zur Zeit**. Ist einer aktiv, kommt `409` mit `{"error": "busy", "detail": "...", "active_run_id": "..."}`.
 
@@ -134,6 +143,8 @@ queued ──► (warming) ──► running ──► finalizing ──┬─�
 - `finalizing`: Video und Protokoll werden geschrieben. Erst danach ist der Status terminal, `video_url` funktioniert also sofort.
 - Im Modus `dream` endet der Lauf, sobald die Erfolgsprüfung besteht (`succeeded`), sonst nach `timeout_s` (`timeout`).
 - `success` setzt **die Simulation**, nicht die API (Konzept-Regel).
+- `attempts`: pro Versuch `{attempt, prompt, api_calls, sim_seconds, success}`, dazu `attempts_used`. `timeout_s` gilt pro Versuch.
+- **Budget:** Vor jedem Dream-Aufruf prüft der Dienst die geschätzten Gesamtkosten gegen `SIM_BUDGET_USD` (Standard 10 $). Ist die Grenze erreicht, endet der Lauf mit `stopped` und `error: "budget_exhausted: …"`, und neue Dream-Läufe bekommen `402`. Dazu kommt die monatliche Budgetgrenze des Dream-Accounts (`over_cap`); sie erscheint als `error: "dream_over_cap: …"`.
 - `cost_usd` = `api_calls` × Preis pro Aufruf (0,0014 $ Basis, 0,0028 $ Fine-Tune, laut Tutorial, an der Abrechnung noch zu prüfen). Bei `mock` immer 0.
 - API- und Simulationsfehler landen in `error` und bringen den Dienst nicht zum Absturz (N4). Abgeschlossene Läufe liegen als `data/runs/<run_id>.json` und `.mp4` vor und überstehen einen Neustart.
 
@@ -145,6 +156,36 @@ Antwort `200`, Status zuerst `stopping`, dann `stopped`. Im Modus `dream` greift
 
 - `video`: `video/mp4` mit 5 fps, 320×270 (Draufsicht oben, beide Handgelenkkameras unten). Es sind dieselben Bilder, die Dream-1 sieht. `404`, solange der Lauf nicht terminal ist.
 - `frame.jpg`: neueste Draufsicht (320×180) des laufenden oder letzten Laufs, sonst die Startszene (640×360). Für eine Live-Kachel reicht Polling alle 200–500 ms.
+
+### Evaluation: `POST /evals`
+
+Wie zuverlässig ist ein Skill mit welchem Prompt, welchem Modell und welcher Wiederholungsstrategie, und was kostet ein Erfolg? Dream-1 meldet selbst keinen Erfolg. Diese Antwort liefert nur die Simulation.
+
+```json
+{
+  "skill": "pick-banana", "mode": "dream", "trials": 10, "seed_start": 0, "timeout_s": 30,
+  "variants": [
+    {"label": "beta-1x", "checkpoint": "dreamlabs/dream-1-beta"},
+    {"label": "beta-3x", "checkpoint": "dreamlabs/dream-1-beta", "max_attempts": 3, "recovery": "rehome",
+     "recovery_prompts": ["grasp the yellow banana and lift it up", "use the right gripper to pick up the banana"]},
+    {"label": "flash-1x", "checkpoint": "dreamlabs/dream-1-beta-flash"}
+  ]
+}
+```
+
+- **Gepaart:** Alle Varianten laufen abwechselnd auf denselben Szenen (`seed_start` … `seed_start + trials - 1`).
+- **Getrennte Seeds:** Testszenen haben Seeds < 1000, Trainingsdaten ≥ 1000. Keine Testszene kommt also im Training vor.
+- `GET /evals/{id}` → `summary` pro Variante:
+
+| Feld | Bedeutung |
+|---|---|
+| `n`, `successes`, `success_rate`, `ci95` | Erfolgsquote mit 95-%-Wilson-Intervall |
+| `first_attempt_rate`, `first_attempt_ci95` | Quote nur des ersten Versuchs, aus denselben Läufen. Der Unterschied zu `success_rate` zeigt, was die Wiederholungen bringen |
+| `api_calls`, `cost_usd`, `cost_per_success_usd` | Aufwand und Kosten pro erfolgreichem Lauf (Schätzung) |
+| `mean_attempts_used`, `errors` | |
+
+- Läuft gerade ein manueller Lauf, wartet die Evaluation, bis er fertig ist. Es läuft eine Evaluation zur Zeit (sonst `409`). Ist das Budget aufgebraucht, endet sie mit `status: "stopped"` und `error: "budget_exhausted"`.
+- Alle Zahlen gelten nur in der Simulation und haben kleine Stichproben. Sie sagen nichts über echte Hardware.
 
 ### Datasets und Fine-Tuning
 
@@ -167,7 +208,8 @@ Antwort `200`, Status zuerst `stopping`, dann `stopped`. Im Modus `dream` greift
 | Status | Codes |
 |---|---|
 | `400` | `invalid_request`, `mock_unavailable`, `invalid_checkpoint`, `cost_not_confirmed` |
-| `404` | `unknown_skill`, `unknown_run`, `no_video`, `unknown_dataset` |
+| `402` | `budget_exhausted` |
+| `404` | `unknown_skill`, `unknown_run`, `no_video`, `unknown_dataset`, `unknown_eval` |
 | `409` | `busy`, `already_finished`, `dataset_not_ready` |
 | `501` | `modal_unavailable` |
 | `502` | Fehler des Dream-Dienstes, z. B. `payment_required` |
@@ -194,6 +236,7 @@ Im Container mit `docker compose run --rm simulation python /app/tools/<script> 
 | `MUJOCO_GL` | `egl` | `osmesa` als Ausweichlösung |
 | `SIM_DATA_DIR` | `/data` | Läufe, Videos, Datasets |
 | `SIM_DEFAULT_TIMEOUT_S` / `SIM_DEFAULT_MOCK_TIMEOUT_S` | `60` / `60` | Standard-Zeitlimits (simulierte Sekunden) |
+| `SIM_BUDGET_USD` | `10` | Harte Grenze für die geschätzten Dream-Kosten aller Läufe dieses Dienstes |
 | `SIM_RENDER_SHADOWS` | `0` | `1` = Schatten und Spiegelungen in Läufen (wie in den Trainingsdaten), etwa 3× langsamer bei Software-Rendering |
 | `SIM_MIN_CALL_INTERVAL_S` | `0.7` | Mindestabstand zwischen API-Aufrufen (Ratenlimit: 3 schnelle, danach 1 pro 0,7 s; N5) |
 | `DREAM_YAM_EXAMPLE` | im Image gepinnt | Pfad zum Dream-Beispiel `yam_mujoco` |

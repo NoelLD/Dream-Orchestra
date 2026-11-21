@@ -2,7 +2,10 @@
 
 mode "mock":  the Dream Labs scripted IK pickup (mock_pickups.run_trial). No API calls, no credits.
 mode "dream": Dream-1 drives both arms through dream.DreamClient (each get_action = 1.6 s of joint targets).
+              A run may take several attempts: after a failed attempt the orchestrator re-homes the arms (or
+              continues) and re-prompts, optionally with a different wording (reliability without training).
 Success comes from the simulator (skills.SuccessTracker / the scripted trial's own check), never from the API.
+Every Dream call is priced (config.price_per_call) and checked against the service budget (config.BUDGET_USD).
 """
 
 import base64
@@ -14,6 +17,7 @@ import threading
 import time
 import uuid
 from collections import deque
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -21,42 +25,63 @@ import numpy as np
 from PIL import Image
 
 from . import config
+from .render import SmallRenderer
 from .skills import SKILLS, Skill, SuccessTracker
 
 log = logging.getLogger("simulation.runner")
 
 TERMINAL = {"succeeded", "failed", "timeout", "stopped", "error"}
 JITTER_M = 0.03
-VIDEO_FPS = 5
-RECORD_EVERY = 4  # sim steps are 50 ms -> 5 fps video; the same frames feed Dream-1 (rendered once)
 SIM_STEP_S = 0.05
-RENDER_W, RENDER_H = 320, 240
-RENDER_CROP = slice(30, 210)  # 320x180, the station crop of the 640x480 render at half size
-WALL_FACTOR = 10  # hard wall-clock cap: 10x timeout_s (software rendering is slower than real time)
+RECORD_EVERY = 4  # sim steps are 50 ms -> 5 fps video; the same frames feed Dream-1 (rendered once)
+VIDEO_FPS = 5
+WALL_FACTOR = 10  # hard wall-clock cap per attempt: 10x timeout_s (software rendering is slower than real time)
 WARMING_CAP_S = 3600  # a fine-tune may take up to 1 h to start
+REHOME_STEPS = 20  # 1 s of sim time to drive both arms back to home before a new attempt
+HOME = np.r_[np.zeros(6), 1.0]  # six joints at zero, gripper open
 
 
 class RunInterrupted(Exception):
-    """Raised inside the sim loop to end a run early; `status` says why."""
+    """Raised inside the sim loop to end a run (or an attempt) early."""
 
-    def __init__(self, status: str):
+    def __init__(self, status: str, reason: str = "", error: str | None = None):
         super().__init__(status)
-        self.status = status
+        self.status, self.reason, self.error = status, reason, error
 
 
 def now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+@dataclass
+class RunSpec:
+    skill: Skill
+    mode: str  # "mock" | "dream"
+    prompt: str
+    checkpoint: str
+    timeout_s: float  # simulated seconds per attempt
+    seed: int
+    record_video: bool = True
+    max_attempts: int = 1
+    recovery: str = "rehome"  # "rehome" | "continue"
+    recovery_prompts: list[str] = field(default_factory=list)
+    eval_id: str | None = None
+
+    def prompt_for(self, attempt: int) -> str:
+        """Attempt 0 uses the prompt; attempt k uses recovery_prompts[k-1] when given, else the prompt again."""
+        if attempt == 0 or attempt - 1 >= len(self.recovery_prompts):
+            return self.prompt
+        return self.recovery_prompts[attempt - 1]
+
+
 class Run:
-    def __init__(self, skill: Skill, mode: str, prompt: str, checkpoint: str, timeout_s: float, seed: int,
-                 record_video: bool):
+    def __init__(self, spec: RunSpec):
+        self.spec = spec
         self.run_id = "run_" + uuid.uuid4().hex[:8]
-        self.skill, self.mode, self.prompt, self.checkpoint = skill, mode, prompt, checkpoint
-        self.timeout_s, self.seed, self.record_video = timeout_s, seed, record_video
         self.status = "queued"
         self.success: bool | None = None
         self.success_detail: dict = {}
+        self.attempts: list[dict] = []
         self.created_at = now()
         self.started_at: str | None = None
         self.finished_at: str | None = None
@@ -68,22 +93,28 @@ class Run:
 
     @property
     def cost_usd(self) -> float:
-        if self.mode == "mock":
+        if self.spec.mode == "mock":
             return 0.0
-        return round(self.api_calls * config.price_per_call(self.checkpoint), 4)
+        return round(self.api_calls * config.price_per_call(self.spec.checkpoint), 4)
 
     def public(self) -> dict:
+        s = self.spec
         return {
             "run_id": self.run_id,
-            "skill": self.skill.name,
-            "mode": self.mode,
-            "prompt": self.prompt,
-            "checkpoint": self.checkpoint if self.mode == "dream" else None,
-            "seed": self.seed,
-            "timeout_s": self.timeout_s,
+            "skill": s.skill.name,
+            "mode": s.mode,
+            "prompt": s.prompt,
+            "checkpoint": s.checkpoint if s.mode == "dream" else None,
+            "seed": s.seed,
+            "timeout_s": s.timeout_s,
+            "max_attempts": s.max_attempts,
+            "recovery": s.recovery if s.max_attempts > 1 else None,
+            "eval_id": s.eval_id,
             "status": self.status,
             "success": self.success,
             "success_detail": self.success_detail,
+            "attempts": self.attempts,
+            "attempts_used": len(self.attempts),
             "created_at": self.created_at,
             "started_at": self.started_at,
             "finished_at": self.finished_at,
@@ -131,7 +162,7 @@ class Recorder:
 
 
 def jitter_scene(env, seed: int) -> None:
-    """Move banana and apple up to +-3 cm, reproducibly per seed."""
+    """Move banana and apple up to +-3 cm, reproducibly per seed (evaluation seeds < 1000, training >= 1000)."""
     import mujoco
 
     rng = np.random.default_rng(seed)
@@ -155,16 +186,18 @@ class RunManager:
                 log.warning("unreadable run record %s", path)
 
     # ---- public API ----------------------------------------------------------------------------------------
-    def start(self, skill: Skill, mode: str, prompt: str, checkpoint: str, timeout_s: float, seed: int,
-              record_video: bool) -> Run:
+    def start(self, spec: RunSpec) -> Run:
         with self.lock:
             if self.active is not None and self.active.status not in TERMINAL:
                 raise BusyError(self.active.run_id)
-            run = Run(skill, mode, prompt, checkpoint, timeout_s, seed, record_video)
+            run = Run(spec)
             self.runs[run.run_id] = run
             self.active = run
         threading.Thread(target=self._execute, args=(run,), name=run.run_id, daemon=True).start()
         return run
+
+    def busy(self) -> bool:
+        return self.active is not None and self.active.status not in TERMINAL
 
     def get(self, run_id: str) -> dict | None:
         if run_id in self.runs:
@@ -193,6 +226,18 @@ class RunManager:
         run.stop_event.set()
         return run
 
+    def spent_usd(self) -> float:
+        """Estimated Dream spend of every run this service has recorded (survives restarts via data/runs)."""
+        current = sum(r.cost_usd for r in self.runs.values())
+        earlier = sum(h.get("cost_usd", 0.0) for h in self.history if h["run_id"] not in self.runs)
+        return round(current + earlier, 4)
+
+    def budget(self) -> dict:
+        spent = self.spent_usd()
+        return {"budget_usd": config.BUDGET_USD, "spent_usd": spent,
+                "remaining_usd": round(max(0.0, config.BUDGET_USD - spent), 4),
+                "price_per_call_usd": config.PRICE_PER_CALL_USD, "is_estimate": True}
+
     def preview_jpeg(self) -> bytes:
         """Newest frame of the current/last run, or a fresh render of the start scene."""
         if self.latest_jpeg is not None:
@@ -201,11 +246,13 @@ class RunManager:
         from yam_env import YamEnv
 
         env = YamEnv()
+        renderer = SmallRenderer(env.model, shadows=config.RENDER_SHADOWS)
         try:
             buffer = io.BytesIO()
-            Image.fromarray(env.images()["top"]).save(buffer, format="JPEG", quality=80)
+            Image.fromarray(renderer.views(env.data)["top"]).save(buffer, format="JPEG", quality=80)
             self.latest_jpeg = buffer.getvalue()
         finally:
+            renderer.close()
             env.close()
         return self.latest_jpeg
 
@@ -217,22 +264,23 @@ class RunManager:
         started = time.monotonic()
         run.started_at = now()
         final = "error"
-        recorder = Recorder(run.record_video, self._set_frame)
+        recorder = Recorder(run.spec.record_video, self._set_frame)
         try:
             config.import_example()
             os.chdir(config.WORK_DIR)  # the example writes relative paths (mock_results/)
-            if run.mode == "mock":
+            if run.spec.mode == "mock":
                 final = self._run_mock(run, recorder, started)
             else:
                 final = self._run_dream(run, recorder)
         except RunInterrupted as interrupted:
             final = interrupted.status
             run.success = False
+            run.error = interrupted.error
         except Exception as error:  # every failure ends up in the run record, never in a crash (N4)
             log.exception("run %s failed", run.run_id)
             final = "error"
             run.success = False
-            run.error = f"{type(error).__name__}: {str(error)[:300]}"
+            run.error = _describe(error)
         finally:
             run.status = "finalizing"  # writing video and run record
             run.duration_s = round(time.monotonic() - started, 2)
@@ -246,39 +294,30 @@ class RunManager:
             log.info("run %s %s success=%s calls=%s", run.run_id, run.status, run.success, run.api_calls)
 
     def _env_class(self, run: Run, recorder: Recorder, tracker_box: list, deadline_box: list):
-        """A YamEnv that jitters the scene, records frames, tracks success and honours stop/timeout."""
+        """A YamEnv that jitters the scene, records frames, tracks success and honours stop/timeouts."""
         from yam_env import YamEnv
 
         class RunEnv(YamEnv):
             def __init__(self):
                 super().__init__()
                 self.steps = 0
-                self._small = None
+                self._small: SmallRenderer | None = None
                 self._cached_step, self._cached = -1, None
-                jitter_scene(self, run.seed)
-                tracker_box[0] = SuccessTracker(run.skill, self)
+                jitter_scene(self, run.spec.seed)
+                tracker_box[0] = SuccessTracker(run.spec.skill, self)
 
             @property
             def sim_seconds(self) -> float:
                 return self.steps * SIM_STEP_S
 
             def images(self):
-                """320x180 renders (the model sees 320x176 anyway), at most once per sim step: ~4x cheaper."""
+                """320x180 renders (app/render.py), at most once per sim step."""
                 if self._cached_step == self.steps:
                     return self._cached
-                import mujoco
-
                 if self._small is None:
-                    self._small = mujoco.Renderer(self.model, height=RENDER_H, width=RENDER_W)
-                    # Shadows on the detailed meshes cost ~3x under software rendering (642 vs 207 ms per 3 views).
-                    self._small.scene.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = config.RENDER_SHADOWS
-                    self._small.scene.flags[mujoco.mjtRndFlag.mjRND_REFLECTION] = config.RENDER_SHADOWS
-                images = {}
-                for name in ("top", "left", "right"):
-                    self._small.update_scene(self.data, camera=name)
-                    images[name] = self._small.render()[RENDER_CROP].copy()  # same crop as the station
-                self._cached_step, self._cached = self.steps, images
-                return images
+                    self._small = SmallRenderer(self.model, shadows=config.RENDER_SHADOWS)
+                self._cached_step, self._cached = self.steps, self._small.views(self.data)
+                return self._cached
 
             def close(self):
                 if self._small is not None:
@@ -291,9 +330,9 @@ class RunManager:
                     raise RunInterrupted("stopped")
                 sim_deadline, wall_deadline = deadline_box
                 if sim_deadline is not None and self.sim_seconds > sim_deadline:
-                    raise RunInterrupted("timeout")
+                    raise RunInterrupted("timeout", reason="sim")
                 if time.monotonic() > wall_deadline:
-                    raise RunInterrupted("timeout")
+                    raise RunInterrupted("timeout", reason="wall")
                 state = super().step(left, right)
                 self.steps += 1
                 tracker_box[1] = tracker_box[0].update(self) or tracker_box[1]
@@ -303,101 +342,85 @@ class RunManager:
 
         return RunEnv
 
-    def _run_mock(self, run: Run, recorder: Recorder, started: float) -> None:
+    def _run_mock(self, run: Run, recorder: Recorder, started: float) -> str:
         import mock_pickups
 
-        if not run.skill.mock_available:
-            raise ValueError(f"skill {run.skill.name} has no scripted (mock) version")
+        spec = run.spec
+        if not spec.skill.mock_available:
+            raise ValueError(f"skill {spec.skill.name} has no scripted (mock) version")
         tracker_box = [None, False]
-        deadline_box = [run.timeout_s, started + WALL_FACTOR * run.timeout_s]
+        deadline_box = [spec.timeout_s, started + WALL_FACTOR * spec.timeout_s]
         run.status = "running"
+        run.attempts.append({"attempt": 1, "prompt": None, "api_calls": 0, "success": False})
         mock_pickups.YamEnv = self._env_class(run, recorder, tracker_box, deadline_box)
-        result = mock_pickups.run_trial(run.skill.obj, yaw=run.skill.mock_yaw)
+        result = mock_pickups.run_trial(spec.skill.obj, yaw=spec.skill.mock_yaw)
         run.success = bool(result["passed"])
+        run.attempts[0]["success"] = run.success
         run.success_detail = {k: result[k] for k in ("lift_m", "tcp_distance_m", "release_drop_m") if k in result}
         return "succeeded" if run.success else "failed"
 
-    def _run_dream(self, run: Run, recorder: Recorder) -> None:
+    def _run_dream(self, run: Run, recorder: Recorder) -> str:
         import dream_control as dc
 
+        spec = run.spec
         key = os.environ.get("DREAM_API_KEY", "")
         if not key:
             raise RuntimeError("DREAM_API_KEY is not set")
         gateway = os.environ.get("DREAM_GATEWAY_URL", "https://api.dreamlabs.ai")
         tracker_box = [None, False]
-        deadline_box = [None, time.monotonic() + WARMING_CAP_S]  # sim deadline set once the model answers
+        deadline_box = [None, time.monotonic() + WARMING_CAP_S]
         env = self._env_class(run, recorder, tracker_box, deadline_box)()
         policy = None
+        windows = {name: deque(maxlen=dc.FRAMES) for name in dc.VIDEO_ROLES}
+
+        def capture(keep: bool) -> None:
+            if not keep:
+                return
+            for name, rgb in env.images().items():
+                buffer = io.BytesIO()
+                Image.fromarray(rgb).resize(dc.FRAME_SIZE, Image.BILINEAR).save(buffer, "JPEG", quality=85)
+                windows[name].append(base64.b64encode(buffer.getvalue()).decode("ascii"))
+
+        def succeeded() -> str:
+            run.success = True
+            run.success_detail = tracker_box[0].detail(env)
+            return "succeeded"
+
         try:
-            windows = {name: deque(maxlen=dc.FRAMES) for name in dc.VIDEO_ROLES}
-
-            def capture(keep: bool) -> None:
-                if not keep:
-                    return
-                for name, rgb in env.images().items():
-                    buffer = io.BytesIO()
-                    Image.fromarray(rgb).resize(dc.FRAME_SIZE, Image.BILINEAR).save(buffer, "JPEG", quality=85)
-                    windows[name].append(base64.b64encode(buffer.getvalue()).decode("ascii"))
-
             while any(len(w) < dc.FRAMES for w in windows.values()):  # fill the 9-frame windows, arms holding
                 state = env.state()
                 env.step(state["left"], state["right"])
                 capture(env.steps % dc.FRAME_EVERY_STEPS == 0)
 
-            poses = run.checkpoint in dc.POSE_MODELS
+            poses = spec.checkpoint in dc.POSE_MODELS
             run.status = "warming"
-            policy = dc.open_policy(dc.policy_config(run.checkpoint, gateway, poses), key)
-            dc.feed(policy, env, windows, run.prompt, run.checkpoint, env.steps, every=0, station=poses)
-            restarts, last_call = 0, 0.0
-            while True:
-                if run.stop_event.is_set():
-                    raise RunInterrupted("stopped")
-                if deadline_box[0] is not None and env.sim_seconds > deadline_box[0]:
-                    raise RunInterrupted("timeout")
-                if time.monotonic() > deadline_box[1]:
-                    raise RunInterrupted("timeout")
-                time.sleep(max(0.0, config.MIN_CALL_INTERVAL_S - (time.monotonic() - last_call)))
-                last_call = time.monotonic()
+            policy = dc.open_policy(dc.policy_config(spec.checkpoint, gateway, poses), key)
+            for attempt in range(spec.max_attempts):
+                prompt = spec.prompt_for(attempt)
+                record = {"attempt": attempt + 1, "prompt": prompt, "api_calls": 0, "sim_seconds": 0.0,
+                          "success": False}
+                run.attempts.append(record)
+                if attempt > 0:  # new attempt: optionally re-home, then a fresh Dream episode with the new prompt
+                    deadline_box[0] = None
+                    if spec.recovery == "rehome":
+                        self._rehome(env, capture, dc.FRAME_EVERY_STEPS)
+                    policy = _new_episode(policy, dc, spec.checkpoint, gateway, poses, key)
+                start_sim = env.sim_seconds
                 try:
-                    reply = policy.get_action()
-                except Exception as error:
-                    code = getattr(error, "code", None) or getattr(error, "reason", None)
-                    if code == "pool_warming":  # model is starting; not counted against timeout_s
-                        run.status = "warming"
-                        time.sleep(min(float(getattr(error, "retry_after_s", 10) or 10), 30))
-                        continue
-                    if type(error).__name__ == "DreamSessionExpired" and restarts < 3:
-                        restarts += 1
-                        continue
-                    if not poses and dc.needs_poses(error):
-                        policy.close()
-                        poses = True
-                        policy = dc.open_policy(dc.policy_config(run.checkpoint, gateway, poses), key)
-                        dc.feed(policy, env, windows, run.prompt, run.checkpoint, env.steps, every=0, station=poses)
-                        continue
+                    poses, policy = self._attempt(run, env, policy, windows, capture, prompt, poses, record,
+                                                  deadline_box, tracker_box, dc, gateway, key)
+                except RunInterrupted as interrupted:
+                    record["sim_seconds"] = round(env.sim_seconds - start_sim, 2)
+                    if interrupted.status == "timeout" and interrupted.reason == "sim" \
+                            and attempt + 1 < spec.max_attempts:
+                        continue  # next attempt
+                    run.success_detail = tracker_box[0].detail(env)
                     raise
-                restarts = 0
-                run.api_calls += 1
-                if run.status == "warming":  # timeout_s counts simulated seconds from the first answer
-                    run.status = "running"
-                    deadline_box[0] = env.sim_seconds + run.timeout_s
-                    deadline_box[1] = time.monotonic() + WALL_FACTOR * run.timeout_s
-                left, right = dc.validate_chunk(env, reply, 48, verbose=False)
-                for l_row, r_row in zip(left, right):
-                    tick = time.monotonic()
-                    env.step(l_row, r_row)
-                    keep = env.steps % dc.FRAME_EVERY_STEPS == 0  # same steps the recorder renders: cached
-                    capture(keep)
-                    if keep:
-                        dc.feed(policy, env, windows, run.prompt, run.checkpoint, env.steps, station=poses)
-                    if tracker_box[1]:
-                        run.success = True
-                        run.success_detail = tracker_box[0].detail(env)
-                        return "succeeded"
-                    time.sleep(max(0.0, 0.05 - (time.monotonic() - tick)))  # real-time pacing, 20 Hz
-        except RunInterrupted:
-            run.success_detail = tracker_box[0].detail(env) if tracker_box[0] else {}
-            raise
+                record["sim_seconds"] = round(env.sim_seconds - start_sim, 2)
+                record["success"] = True
+                return succeeded()
+            run.success_detail = tracker_box[0].detail(env)
+            return "timeout"
         finally:
             if policy is not None:
                 try:
@@ -405,6 +428,90 @@ class RunManager:
                 except Exception:
                     log.warning("Dream session release failed; it will expire on the server")
             env.close()
+
+    def _attempt(self, run, env, policy, windows, capture, prompt, poses, record, deadline_box, tracker_box, dc,
+                 gateway, key):
+        """One prompt attempt: call Dream-1 chunk by chunk until the sim says success or the attempt times out."""
+        spec = run.spec
+        dc.feed(policy, env, windows, prompt, spec.checkpoint, env.steps, every=0, station=poses)
+        restarts, last_call, answered = 0, 0.0, False
+        while True:
+            if run.stop_event.is_set():
+                raise RunInterrupted("stopped")
+            if deadline_box[0] is not None and env.sim_seconds > deadline_box[0]:
+                raise RunInterrupted("timeout", reason="sim")
+            if time.monotonic() > deadline_box[1]:
+                raise RunInterrupted("timeout", reason="wall")
+            if self.spent_usd() + config.price_per_call(spec.checkpoint) > config.BUDGET_USD:
+                raise RunInterrupted("stopped", error=f"budget_exhausted: service budget {config.BUDGET_USD} USD")
+            time.sleep(max(0.0, config.MIN_CALL_INTERVAL_S - (time.monotonic() - last_call)))
+            last_call = time.monotonic()
+            try:
+                reply = policy.get_action()
+            except Exception as error:
+                code = getattr(error, "code", None) or getattr(error, "reason", None)
+                if code == "pool_warming":  # the model is starting; not counted against timeout_s
+                    run.status = "warming"
+                    time.sleep(min(float(getattr(error, "retry_after_s", 10) or 10), 30))
+                    continue
+                if type(error).__name__ == "DreamSessionExpired" and restarts < 3:
+                    restarts += 1
+                    continue
+                if not poses and dc.needs_poses(error):
+                    policy.close()
+                    poses = True
+                    policy = dc.open_policy(dc.policy_config(spec.checkpoint, gateway, poses), key)
+                    dc.feed(policy, env, windows, prompt, spec.checkpoint, env.steps, every=0, station=poses)
+                    continue
+                raise
+            restarts = 0
+            run.api_calls += 1
+            record["api_calls"] += 1
+            if not answered:  # timeout_s counts simulated seconds from the first answer of this attempt
+                answered = True
+                run.status = "running"
+                deadline_box[0] = env.sim_seconds + spec.timeout_s
+                deadline_box[1] = time.monotonic() + WALL_FACTOR * spec.timeout_s
+            left, right = dc.validate_chunk(env, reply, 48, verbose=False)
+            for l_row, r_row in zip(left, right):
+                tick = time.monotonic()
+                env.step(l_row, r_row)
+                keep = env.steps % dc.FRAME_EVERY_STEPS == 0  # same steps the recorder renders: cached
+                capture(keep)
+                if keep:
+                    dc.feed(policy, env, windows, prompt, spec.checkpoint, env.steps, station=poses)
+                if tracker_box[1]:
+                    return poses, policy
+                time.sleep(max(0.0, SIM_STEP_S - (time.monotonic() - tick)))  # real-time pacing, 20 Hz
+
+    def _rehome(self, env, capture, frame_every: int) -> None:
+        """Drive both arms back to home (grippers open) over REHOME_STEPS sim steps."""
+        state = env.state()
+        start_l, start_r = state["left"].copy(), state["right"].copy()
+        for i in range(1, REHOME_STEPS + 1):
+            alpha = i / REHOME_STEPS
+            left = start_l + (HOME - start_l) * alpha
+            right = start_r + (HOME - start_r) * alpha
+            left[6] = right[6] = 1.0
+            env.step(left, right)
+            capture(env.steps % frame_every == 0)
+
+
+def _new_episode(policy, dc, checkpoint, gateway, poses, key):
+    """A fresh Dream episode (new session) for the next attempt."""
+    reset = getattr(policy, "reset_episode", None)
+    if callable(reset):
+        reset()
+        return policy
+    policy.close()
+    return dc.open_policy(dc.policy_config(checkpoint, gateway, poses), key)
+
+
+def _describe(error: Exception) -> str:
+    reason = getattr(error, "reason", None) or getattr(error, "code", None)
+    if reason == "over_cap":
+        return "dream_over_cap: the Dream Labs account passed its monthly budget cap (raise it on Billing)"
+    return f"{type(error).__name__}: {str(error)[:300]}"
 
 
 class BusyError(Exception):

@@ -33,15 +33,16 @@ app = modal.App("dream-orchestra-demo-gen", image=image)
 
 
 @app.function(cpu=2, memory=4096, timeout=900, retries=1)
-def record_episode(seed: int) -> dict:
-    """Record one randomized episode (skill alternates with the seed) and return the session as a tar."""
+def record_episode(seed: int, skill: str = "both", small: bool = False) -> dict:
+    """Record one randomized episode and return the session as a tar. skill: banana | apple | both (alternating)."""
     import subprocess
 
     start = time.time()
     out = Path(f"/tmp/ep-{seed:04d}")
     proc = subprocess.run(
         ["python", "tools/record_dataset.py", "--out", str(out), "--episodes", "1", "--seed", str(seed),
-         "--randomize", "--skill-offset", str(seed % 2), "--no-validate"],
+         "--randomize", "--skill-offset", str({"banana": 0, "apple": 1}.get(skill, seed % 2)), "--no-validate"]
+        + (["--small"] if small else []),
         cwd="/work", capture_output=True, text=True,
     )
     log = (proc.stdout + proc.stderr)[-2000:]
@@ -57,14 +58,15 @@ def record_episode(seed: int) -> dict:
 
 
 @app.local_entrypoint()
-def main(name: str = "pick-v1", count: int = 2, first_seed: int = 1000):
+def main(name: str = "pick-v1", count: int = 2, first_seed: int = 1000, skill: str = "both", small: bool = False):
+    """Training seeds start at 1000; evaluation uses seeds below 1000, so test scenes are never training scenes."""
     target = DATASETS / name
     target.mkdir(parents=True, exist_ok=True)
     seeds = [s for s in range(first_seed, first_seed + count) if not (target / f"ep-{s:04d}/meta/info.json").exists()]
     print(f"{count - len(seeds)} sessions exist, launching {len(seeds)}")
     runs = target.parent / f"{name}.runs.jsonl"
     ok = 0
-    for result in record_episode.map(seeds, return_exceptions=True):
+    for result in record_episode.map(seeds, kwargs={"skill": skill, "small": small}, return_exceptions=True):
         if isinstance(result, Exception):
             print("worker error:", result)
             continue

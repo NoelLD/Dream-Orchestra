@@ -24,6 +24,8 @@ RENDER_SHADOWS = os.environ.get("SIM_RENDER_SHADOWS", "0") == "1"  # off: ~3x fa
 # Price per get_action call (Dream Labs fine-tuning tutorial, 21.11.2026; to be checked against billing).
 PRICE_PER_CALL_USD = {"base": 0.0014, "fine_tuned": 0.0028}
 PRICE_PER_FINETUNE_STEP_USD = 0.20
+# Hard cap on estimated Dream inference spend of this service (all runs, survives restarts via data/runs).
+BUDGET_USD = float(os.environ.get("SIM_BUDGET_USD", "10"))
 
 BASE_CHECKPOINTS = ("dreamlabs/dream-1-beta", "dreamlabs/dream-1-beta-flash")
 DEFAULT_CHECKPOINT = BASE_CHECKPOINTS[0]

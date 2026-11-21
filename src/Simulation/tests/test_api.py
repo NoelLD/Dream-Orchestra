@@ -79,3 +79,40 @@ def test_stop_ends_a_run():
 def test_finetune_requires_key_and_exact_cost():
     response = client.post("/finetune", json={"dataset": "x", "suffix": "x", "steps": 500, "confirm_cost_usd": 1})
     assert response.status_code == 503  # no key in tests; with a key a wrong cost gives 400 cost_not_confirmed
+
+
+def test_budget_reports_cap_and_spend():
+    body = client.get("/budget").json()
+    assert body["budget_usd"] > 0 and body["spent_usd"] == 0.0 and body["is_estimate"] is True
+
+
+def test_rejects_blank_recovery_prompt():
+    response = client.post("/runs", json={"skill": "pick-banana", "mode": "mock", "max_attempts": 2,
+                                          "recovery_prompts": [" "]})
+    assert response.status_code == 400 and response.json()["error"] == "invalid_request"
+
+
+def test_mock_eval_reports_rates_with_wilson_interval():
+    response = client.post("/evals", json={"skill": "pick-banana", "mode": "mock", "trials": 1, "seed_start": 5,
+                                           "variants": [{"label": "scripted"}]})
+    assert response.status_code == 202
+    eval_id = response.json()["eval_id"]
+    deadline = time.time() + 240
+    while time.time() < deadline:
+        body = client.get(f"/evals/{eval_id}").json()
+        if body["status"] not in ("queued", "running"):
+            break
+        time.sleep(1)
+    assert body["status"] == "completed"
+    summary = body["summary"][0]
+    assert summary["n"] == 1 and summary["success_rate"] == 1.0 and summary["cost_usd"] == 0.0
+    assert summary["ci95"][1] == 1.0 and 0 < summary["ci95"][0] < 1
+
+
+def test_eval_rejects_duplicate_labels_and_training_seeds():
+    dup = client.post("/evals", json={"skill": "pick-banana", "mode": "mock",
+                                      "variants": [{"label": "a"}, {"label": "a"}]})
+    assert dup.status_code == 400
+    seeds = client.post("/evals", json={"skill": "pick-banana", "mode": "mock", "seed_start": 1000,
+                                        "variants": [{"label": "a"}]})
+    assert seeds.status_code == 400

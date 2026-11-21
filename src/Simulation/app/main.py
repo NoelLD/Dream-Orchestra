@@ -11,7 +11,8 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field, field_validator
 
 from . import config
-from .runner import AlreadyFinishedError, BusyError, RunManager
+from .evals import EvalManager
+from .runner import AlreadyFinishedError, BusyError, RunManager, RunSpec
 from .skills import SKILLS
 from .training import ConflictError, NotFoundError, TrainingState, modal_available
 
@@ -19,11 +20,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 
 app = FastAPI(
     title="Dream Orchestra – Simulation",
-    version="0.2.0",
-    description="Runs skills on two YAM arms in MuJoCo (mock = scripted, dream = Dream-1), "
-    "builds demo datasets and starts Dream Labs fine-tunes. Success is measured by the simulator.",
+    version="0.3.0",
+    description="Runs skills on two YAM arms in MuJoCo (mock = scripted, dream = Dream-1) with retries and a "
+    "budget, evaluates prompt/checkpoint/retry variants, builds demo datasets and starts Dream Labs fine-tunes. "
+    "Success is measured by the simulator.",
 )
 runs = RunManager()
+evals = EvalManager(runs)
 training = TrainingState()
 
 
@@ -54,6 +57,9 @@ class RunRequest(BaseModel):
     timeout_s: float | None = Field(None, ge=5, le=600)  # simulated seconds; None: 60
     seed: int | None = None
     record_video: bool = True
+    max_attempts: int = Field(1, ge=1, le=5)  # >1: re-prompt after a failed attempt (F9)
+    recovery: Literal["rehome", "continue"] = "rehome"  # before a new attempt: arms home, or carry on
+    recovery_prompts: list[str] = Field(default_factory=list, max_length=4)  # prompts for attempts 2, 3, ...
 
     @field_validator("prompt")
     @classmethod
@@ -61,6 +67,31 @@ class RunRequest(BaseModel):
         if value is not None and not value.strip():
             raise ValueError("prompt must not be empty")
         return value
+
+    @field_validator("recovery_prompts")
+    @classmethod
+    def recovery_prompts_not_blank(cls, value):
+        if any(not p.strip() for p in value):
+            raise ValueError("recovery prompts must not be empty")
+        return value
+
+
+class EvalVariant(BaseModel):
+    label: str = Field(pattern=r"^[A-Za-z0-9 _.+-]{1,40}$")
+    prompt: str | None = None
+    checkpoint: str | None = None
+    max_attempts: int = Field(1, ge=1, le=5)
+    recovery: Literal["rehome", "continue"] = "rehome"
+    recovery_prompts: list[str] = Field(default_factory=list, max_length=4)
+
+
+class EvalRequest(BaseModel):
+    skill: str
+    variants: list[EvalVariant] = Field(min_length=1, max_length=6)
+    trials: int = Field(10, ge=1, le=100)
+    seed_start: int = Field(0, ge=0, le=999)  # evaluation seeds stay below 1000 (training data uses >= 1000)
+    timeout_s: float = Field(30, ge=5, le=600)
+    mode: Literal["dream", "mock"] = "dream"
 
 
 class DatasetRequest(BaseModel):
@@ -107,14 +138,18 @@ def start_run(req: RunRequest):
     if req.mode == "dream" and not (req.checkpoint in config.BASE_CHECKPOINTS
                                     or req.checkpoint.startswith("dream-1-ft:")):
         raise ApiError(400, "invalid_checkpoint", f"unknown checkpoint {req.checkpoint!r}")
+    if req.mode == "dream" and runs.budget()["remaining_usd"] <= 0:
+        raise ApiError(402, "budget_exhausted", f"service budget of {config.BUDGET_USD} USD is used up")
     seed = req.seed if req.seed is not None else random.randint(0, 2**31 - 1)
     timeout_s = req.timeout_s or (config.DEFAULT_TIMEOUT_S if req.mode == "dream" else config.DEFAULT_MOCK_TIMEOUT_S)
+    spec = RunSpec(skill=skill, mode=req.mode, prompt=req.prompt or skill.default_prompt, checkpoint=req.checkpoint,
+                   timeout_s=timeout_s, seed=seed, record_video=req.record_video, max_attempts=req.max_attempts,
+                   recovery=req.recovery, recovery_prompts=req.recovery_prompts)
     try:
-        run = runs.start(skill, req.mode, req.prompt or skill.default_prompt, req.checkpoint, timeout_s, seed,
-                         req.record_video)
+        run = runs.start(spec)
     except BusyError as busy:
         raise ApiError(409, "busy", "another run is active", active_run_id=busy.active_run_id)
-    return {"run_id": run.run_id, "status": run.status, "mode": run.mode}
+    return {"run_id": run.run_id, "status": run.status, "mode": req.mode}
 
 
 @app.get("/runs")
@@ -227,3 +262,58 @@ def get_finetune(job_id: str):
             "fine_tuned_model": job.get("fine_tuned_model"), "error": job.get("error"),
             "created_at": job.get("created_at"), "started_at": job.get("started_at"),
             "finished_at": job.get("finished_at")}
+
+
+# ---- budget & evaluations ------------------------------------------------------------------------------------
+@app.get("/budget")
+def budget():
+    return runs.budget()
+
+
+@app.post("/evals", status_code=202)
+def start_eval(req: EvalRequest):
+    skill = SKILLS.get(req.skill)
+    if skill is None:
+        raise ApiError(404, "unknown_skill", f"no skill {req.skill!r}; see GET /skills")
+    labels = [v.label for v in req.variants]
+    if len(set(labels)) != len(labels):
+        raise ApiError(400, "invalid_request", "variant labels must be unique")
+    if req.mode == "mock" and not skill.mock_available:
+        raise ApiError(400, "mock_unavailable", f"skill {req.skill} has no scripted (mock) version")
+    if req.mode == "dream":
+        if not config.dream_key_set():
+            raise ApiError(503, "no_api_key", "DREAM_API_KEY is not set in the simulation container")
+        for v in req.variants:
+            if v.checkpoint and not (v.checkpoint in config.BASE_CHECKPOINTS or v.checkpoint.startswith("dream-1-ft:")):
+                raise ApiError(400, "invalid_checkpoint", f"unknown checkpoint {v.checkpoint!r}")
+        if runs.budget()["remaining_usd"] <= 0:
+            raise ApiError(402, "budget_exhausted", f"service budget of {config.BUDGET_USD} USD is used up")
+    try:
+        evaluation = evals.start(skill, [v.model_dump() for v in req.variants], req.trials, req.seed_start,
+                                 req.timeout_s, req.mode)
+    except BusyError as busy:
+        raise ApiError(409, "busy", "another evaluation is running", active_eval_id=busy.active_run_id)
+    return {"eval_id": evaluation.eval_id, "status": evaluation.status,
+            "runs_planned": req.trials * len(req.variants)}
+
+
+@app.get("/evals")
+def list_evals():
+    return evals.list()
+
+
+@app.get("/evals/{eval_id}")
+def get_eval(eval_id: str):
+    record = evals.get(eval_id)
+    if record is None:
+        raise ApiError(404, "unknown_eval", f"no evaluation {eval_id}")
+    return record
+
+
+@app.post("/evals/{eval_id}/stop")
+def stop_eval(eval_id: str):
+    try:
+        evaluation = evals.stop(eval_id)
+    except KeyError:
+        raise ApiError(404, "unknown_eval", f"no evaluation {eval_id}")
+    return evaluation.public()
