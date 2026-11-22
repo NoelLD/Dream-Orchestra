@@ -53,6 +53,11 @@ export const DEFAULT_MOCK_DEVICES: readonly Device[] = [
   { id: 'lampe', name: 'Signallampe grün', kind: 'actuator', type: 'lamp', value: false, ...VIRTUAL },
   { id: 'lampe-rot', name: 'Signallampe rot', kind: 'actuator', type: 'lamp', value: false, ...VIRTUAL },
   { id: 'foerderband', name: 'Förderband', kind: 'actuator', type: 'conveyor', value: false, ...VIRTUAL },
+  // Zellen-Geräte (im echten Backend gespiegelt aus der Zellen-Sitzung, hier nur nachgespielt)
+  { id: 'zelle-maschine-fertig', name: 'Zelle: Maschine fertig', kind: 'sensor', type: 'switch', value: false, ...VIRTUAL },
+  { id: 'zelle-cnc-maschine', name: 'Zelle: CNC-Maschine', kind: 'actuator', type: 'machine', value: false, ...VIRTUAL },
+  { id: 'zelle-ampel-rot', name: 'Zelle: Ampel rot', kind: 'actuator', type: 'lamp', value: false, ...VIRTUAL },
+  { id: 'zelle-ampel-gruen', name: 'Zelle: Ampel grün', kind: 'actuator', type: 'lamp', value: false, ...VIRTUAL },
 ]
 
 const DEVICE_NODE_TYPES = new Set<WorkflowNode['type']>(['waitSensor', 'condition', 'setActuator'])

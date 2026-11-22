@@ -1,10 +1,106 @@
-# DreamOrchestra
+<div align="center">
+
+# 🤖 Dream Orchestra
+
+### Dream Orchestra turns Dream-1 skills into machine workflows and measures whether they actually work.
+
+**Draw the process as a workflow: robot skills, machine steps, sensors, error paths.**<br>
+**Run it in a simulated cell, and fine-tune Dream-1 only when the numbers say it pays off.**
+
+[![Results](https://img.shields.io/badge/results-live%20page-2a78d6?style=for-the-badge)](https://cell-finetune-results.martinkaiser-bln.workers.dev)
+
+![Dream-1](https://img.shields.io/badge/Dream--1-skills%20·%20fine--tuning-1c5cab)
+![MuJoCo](https://img.shields.io/badge/MuJoCo-two%20simulated%20cells-555)
+![FastAPI](https://img.shields.io/badge/FastAPI-workflow%20engine%20·%20simulation%20API-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-React%20Flow%20editor-61dafb?logo=react&logoColor=black)
+![Tests](https://img.shields.io/badge/tests-66%20backend%20·%2082%20frontend-2ea44f)
+
+REMix × Dream Labs hackathon, Berlin, 21–22 Nov 2026 · [Results page](https://cell-finetune-results.martinkaiser-bln.workers.dev)
+
+</div>
+
+> **Try it (local, about 5 minutes, no Dream credits):** `DREAM_API_MODE=sim docker compose up -d --build`, open
+> `http://localhost:8080`. In the workflow editor pick **Beispiel laden → CNC-Zyklus (Zelle)** and press
+> **Lauf starten**; watch it in the **Zellen-Leitstand** tab. Then load **CNC-Zyklus: Fehlerfall**: the unload step
+> fails, the workflow takes its error path and switches the stack light to red. In `sim` mode the arm is moved by
+> the scripted reference controller, not by Dream-1; the log labels every step.
+
+![CNC cycle as a workflow: load blank, start machine, wait for "machine done", unload, green light; every step has an error path to a red stack light](docs/img/cnc-workflow.jpg)
+
+## The idea
+
+A Dream-1 skill is a prompt that moves a robot. A factory needs more than that: the robot step has to wait for a
+machine, react to sensors, and do something sensible when it fails. And before a learned skill runs in a real cell,
+someone has to know how often it succeeds there. Today that means custom glue code and gut feeling.
+
+| Without | With Dream Orchestra |
+|---|---|
+| Robot prompt and machine logic in separate scripts | One workflow: skills, machine steps, sensor waits, conditions, loops, error paths |
+| A failed grasp stops everything, silently | Every step has a time limit, retries and an error path; the log shows API status, duration and credits |
+| "The fine-tune looks better in the video" | Success, contacts and time measured on the same test scenes, paired, with the noise of repeat runs |
+| Fine-tune first, ask later | Measure the base in your cell first; train only where it is weak |
+
+## How it works
+
+1. **Skills**: a Dream-1 prompt per robot type, e.g. *"put the metal block on the machine tray"*.
+2. **Workflow**: the visual editor chains skills with *Aktor setzen*, *Warte auf Sensor*, *Bedingung* and an error
+   path. The backend engine runs it (pause, single step, STOP at any time).
+3. **Cell and devices**: sensors and actuators are devices with an adapter (virtual today, MQTT and OPC UA settings
+   prepared). In `sim` mode the cell devices (`zelle-*`) mirror a live MuJoCo cell: CNC machine with door, tray and
+   stack light, or a sorting conveyor.
+4. **Measured fine-tune**: the scripted expert records checked demonstrations, a gated script uploads them and starts
+   the Dream-1 fine-tune only if replay and validation pass, and the evaluation compares base and fine-tune on 40
+   identical scenes.
+
+| Execution | Who moves the arm | Labelled in the log as |
+|---|---|---|
+| `mock` backend | nobody (stand-in) | banner "SIMULIERTE API" |
+| `sim` backend, cell task | scripted reference controller | **Referenz-Controller** |
+| `real` backend, cell task | only with checkpoint `referenz` (explicit); a learned checkpoint stops the block with a clear message | **Referenz-Controller** |
+| `real` backend, other skills | Dream-1 in MuJoCo (costs credits) | **Simulationslauf** |
+
+**Failure handling in the cell:** an actuator block waits for the cell's acknowledgement (a blocked cycle start, e.g.
+no blank on the tray, takes the error path); cell sensors report *not available* instead of an old value when the
+cell is unreachable or the last reading is older than 2 s. Dream-1 itself runs in the cells in the evaluation
+(`src/Simulation/tools/eval_cells.py`), not yet inside a workflow.
+
+## Results (simulation, first attempt per scene)
+
+From [`docs/results/report_corrected.md`](docs/results/report_corrected.md), 40 identical test scenes per model,
+4 tasks × 10 seeds, never used in training.
+
+| Model | Success | Paired vs base | Solved within 30 s |
+|---|---|---|---|
+| Scripted expert (reference) | 39/40 | – | 39/40 |
+| Dream-1 beta, two runs | 6/40, 7/40 | 11 scenes flip between the runs | 4, 2 |
+| Fine-tune, 160 cell demos | 14/40 | 11 : 3, p = 0.057 | 13 |
+| Same recipe, second training | 17/40 | 14 : 3, p = 0.013 | 12 |
+| Learning rate 3e-5 | 20/40 | 19 : 5, p = 0.007 | 20 |
+| 50 % Dream base data mixed in | 6/40 | 6 : 6, p = 1.0 | 5 |
+
+**Limits:** simulation only; runs with arm–cell contact go up with fine-tuning (8 → 13–17 of 40), so no safety
+claim; per-task results are not stable across trainings. A transfer test on an untrained, similar task is
+pre-registered in [`docs/results/TRANSFER_PREREG.md`](docs/results/TRANSFER_PREREG.md).
+
+## Questions we expect
+
+- **"Your scripted expert gets 39/40. Why Dream-1?"** The expert is programmed per cell and task; it is how we
+  produce demonstrations and a reference. Dream-1 learns from demonstrations. The platform's job is to show, per
+  robot type and cell, whether a learned skill is good enough, before anyone relies on it.
+- **"Is it safer after fine-tuning?"** No evidence for that; contacts go up. We report it.
+- **"Does it work on a real robot?"** Not tested. Everything here is MuJoCo.
+
+![Cell control room: live view of the CNC cell with tasks, controls and sensor states](docs/img/cell-control-room.jpg)
+
+---
+
+## Details (Deutsch)
 
 Docker Compose startet das Frontend mit Nginx, das Backend mit Python 3.12, den Simulationsdienst mit Python 3.12, MuJoCo und FastAPI und den SQLite-Datenbankdienst. Die API des Simulationsdienstes beschreibt [`src/Simulation/README.md`](src/Simulation/README.md), die Live-Doku liegt unter `http://localhost:3001/docs`.
 
-## Setup
+### Setup
 
-Docker starten und in den Ordner mit `compose.yaml` wechseln (`implementierung/`). Alle vier Dienste starten mit `docker compose up`. Mit `--build` werden die Images vorher gebaut.
+Docker starten und in den Repo-Ordner wechseln (dort liegt `compose.yaml`). Alle Dienste starten mit `docker compose up`. Das Backend startet ohne Angabe im Modus `mock` (ohne Simulation); für die Zellen-Demo `DREAM_API_MODE=sim docker compose up -d --build` verwenden, `real` kostet Dream-Credits. Mit `--build` werden die Images vorher gebaut.
 
 ```sh
 docker compose up --build
@@ -22,7 +118,7 @@ Für einen einzelnen Dienst beispielsweise `docker compose up --build backend` a
 
 Compose bindet jeden Quellordner schreibgeschützt ein. Nach Änderungen am Backend oder Simulationsserver den Dienst neu starten, beispielsweise mit `docker compose restart backend`. `docker compose down` stoppt die Dienste.
 
-## SQLite und Datenmodell
+### SQLite und Datenmodell
 
 Der Dienst `database` legt beim ersten Start `src/Backend/data/dreamorchestra.sqlite3` an. Die Datei bleibt nach `docker compose down` auf dem Host erhalten und wird von Git ignoriert. Über `http://localhost:8000/health/database` prüft das Backend die Verbindung zum Datenbankdienst.
 
@@ -34,7 +130,7 @@ Für SQL-Abfragen die SQLite-Shell im Datenbankcontainer öffnen. [Python-Dokume
 docker compose exec database python -m sqlite3 /data/dreamorchestra.sqlite3
 ```
 
-## Dream-Labs-Verbindungstest
+### Dream-Labs-Verbindungstest
 
 Falls `.env` fehlt, `.env.template` als `.env` kopieren. Dann `DREAM_API_KEY` eintragen. Der Test ruft den Modellkatalog ab und zeigt SDK-Version und Anzahl der Checkpoints an. [Dream-Labs-Plattform](https://platform.dreamlabs.ai/)
 
@@ -44,7 +140,7 @@ docker compose run --rm --build backend python test_dream_api.py
 
 In PowerShell startet `./start.ps1` den Verbindungstest auch ohne Compose.
 
-## Umgebungsvariablen
+### Umgebungsvariablen
 
 Compose übergibt `.env` an den Backend-Dienst. Der Dream-Labs-Verbindungstest benötigt den API-Key. Werte als `NAME=Wert` ohne Anführungszeichen eintragen. Die optionalen URLs nur ändern, wenn Dream Labs für den Zugang andere Adressen vorgibt.
 

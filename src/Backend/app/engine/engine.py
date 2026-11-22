@@ -196,12 +196,16 @@ class Engine:
         if isinstance(params, WaitSensorParams):
             return await self._wait_sensor(block, params)
         if isinstance(params, ConditionParams):
-            value = self.devices.get(params.device).value
+            value = self._read(params.device).value
             result = holds(value, params.operator, params.value)
             self.sink.log(f"{params.device} = {fmt(value)} → {'wahr' if result else 'sonst'}", block_id=block.id)
             return Port.TRUE if result else Port.FALSE
         if isinstance(params, SetActuatorParams):
-            self.devices.set(params.device, params.value)
+            apply = getattr(self.devices, "apply", None)  # Gerätestamm mit Quittung (z. B. Zellen-Aktion)
+            if apply is not None:
+                await apply(params.device, params.value)
+            else:
+                self.devices.set(params.device, params.value)
             self.sink.log(f"{params.device} := {fmt(params.value)}", block_id=block.id)
             return Port.NEXT
         if isinstance(params, WaitTimeParams):
@@ -267,7 +271,7 @@ class Engine:
     async def _wait_sensor(self, block: Block, params: WaitSensorParams) -> Port:
         timeout = params.timeout_s  # None = ohne Zeitlimit (F12); Stopp bleibt jederzeit möglich
         started = time.monotonic()
-        while not holds(self.devices.get(params.device).value, params.operator, params.value):
+        while not holds(self._read(params.device).value, params.operator, params.value):
             if timeout is not None and time.monotonic() - started >= timeout:
                 raise BlockError(
                     f"Zeitlimit {timeout:g} s: {params.device} {params.operator} {fmt(params.value)} nicht erfüllt"
@@ -279,6 +283,11 @@ class Engine:
             duration_ms=(time.monotonic() - started) * 1000,
         )
         return Port.NEXT
+
+    def _read(self, device_id: str) -> Any:
+        """Sensorwert für Bedingungen und Wartesblöcke; ein Gerätestamm mit `read` meldet veraltete Werte als Fehler."""
+        read = getattr(self.devices, "read", None)
+        return read(device_id) if read is not None else self.devices.get(device_id)
 
     async def _stop_dream_run(self) -> None:
         run_id, self._dream_run = self._dream_run, None

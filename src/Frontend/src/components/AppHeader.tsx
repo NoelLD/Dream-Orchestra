@@ -56,6 +56,7 @@ export function AppHeader() {
     <header className="flex h-12 shrink-0 items-center gap-3 border-b bg-slate-900 px-4 text-white">
       <Workflow className="size-5" aria-hidden />
       <h1 className="text-base font-semibold">DreamOrchestra</h1>
+      <span className="hidden text-xs text-slate-300 xl:inline">Dream-1-Skills als Maschinen-Workflows – mit Messung, ob sie wirklich funktionieren</span>
       <span
         data-testid="api-mode"
         className={simulated ? 'rounded bg-amber-400 px-2 py-0.5 text-xs font-bold text-black' : 'rounded bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white'}

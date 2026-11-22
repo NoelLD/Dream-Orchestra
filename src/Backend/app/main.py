@@ -1,5 +1,6 @@
 """FastAPI-App. Swagger: /docs, OpenAPI-Schema (Vertrag fürs Frontend): /openapi.json"""
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -16,6 +17,7 @@ from app.config import Settings, get_settings
 from app.db import repo
 from app.db.database import Database
 from app.devices.adapter import DeviceRegistry
+from app.dream.cells import CELL_DEVICES, CellBridge, CellDreamClient
 from app.dream.client import DreamClient
 from app.dream.fake import FakeDreamClient
 from app.dream.simulation import SimulationApi, SimulationDreamClient
@@ -34,7 +36,12 @@ def build_services(settings: Settings) -> Services:
         dream = FakeDreamClient(settings.fake_run_duration_s)
     else:
         sim_mode = "dream" if settings.dream_api_mode == "real" else "mock"
-        dream = SimulationDreamClient(sim_api, sim_mode=sim_mode, label=settings.dream_api_mode)
+        # Zellen-Tasks laufen über /cells mit dem geskripteten Referenz-Controller, alles andere über /runs
+        dream = CellDreamClient(
+            SimulationDreamClient(sim_api, sim_mode=sim_mode, label=settings.dream_api_mode),
+            sim_api,
+            allow_scripted=settings.dream_api_mode == "sim",  # real: nur mit Checkpoint "referenz"
+        )
     db = Database(settings.database_path)
     devices = DeviceRegistry(db)
     registry = RunRegistry(
@@ -59,12 +66,24 @@ def create_app(settings: Settings | None = None, factory: Callable[[Settings], S
         services = factory(settings)
         services.db.init_schema(settings.schema_path)
         services.devices.load()
+        bridge = None
+        if settings.dream_api_mode != "mock":  # Zellen-Geräte nur mit Simulationsdienst
+            services.devices.ensure(d for d, _ in CELL_DEVICES.values())
+            bridge = CellBridge(services.simulation, services.devices)
+            services.devices.guards.append(bridge.unavailable)
+            services.devices.apply_hooks.append(bridge.apply)
+            bridge.start()
+            if isinstance(services.dream, CellDreamClient):
+                prime = asyncio.create_task(services.dream.prime())
         repo.fail_open_runs(services.db)
         app.state.services = services
         logger.info("Dream-Modus: %s (%s)", settings.dream_api_mode, settings.api_banner)
         try:
             yield
         finally:
+            if bridge:
+                await bridge.stop()
+                prime.cancel()
             await services.runs.shutdown()
             await services.dream.aclose()
             await services.simulation.aclose()

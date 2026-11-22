@@ -79,6 +79,9 @@ function ActuatorDisplay({ device }: { device: Device }) {
       </span>
     )
   }
+  if (device.type === 'machine') {
+    return <span className={cn('rounded px-1.5 py-0.5 text-xs font-medium', on ? 'bg-amber-200 text-amber-950' : 'text-slate-600')}>{on ? 'Zyklus läuft' : 'bereit'}</span>
+  }
   return <span className="text-xs font-medium">{String(device.value)}</span>
 }
 

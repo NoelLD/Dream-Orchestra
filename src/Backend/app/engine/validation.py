@@ -26,6 +26,7 @@ def validate(
     devices: Mapping[str, DeviceKind],
     skill_ids: set[int],
     require_skill: bool = False,
+    skill_free_prompts: frozenset[str] = frozenset(),
 ) -> ValidationResult:
     errors: list[Issue] = []
 
@@ -63,7 +64,7 @@ def validate(
         for port_name, targets in outgoing[block.id].items():
             if len(targets) > 1:
                 error(f"Ausgang '{port_name}' hat mehrere Pfeile", block.id)
-        _check_params(block.type, block.params, block.id, devices, skill_ids, require_skill, error)
+        _check_params(block.type, block.params, block.id, devices, skill_ids, require_skill, skill_free_prompts, error)
 
     # Keine losen Blöcke: alles muss vom Start aus erreichbar sein.
     seen, stack = set(starts), list(starts)
@@ -86,6 +87,7 @@ def _check_params(
     devices: Mapping[str, DeviceKind],
     skill_ids: set[int],
     require_skill: bool,
+    skill_free_prompts: frozenset[str],
     error: Callable[[str, str | None], None],
 ) -> None:
     try:
@@ -100,7 +102,8 @@ def _check_params(
         if not parsed.prompt.strip():
             error("Leerer Prompt", block_id)
         if parsed.skill_id is None:
-            if require_skill:
+            # Zellen-Tasks (genau ihr Prompt) messen den Erfolg in der Zelle und brauchen keinen Skill
+            if require_skill and parsed.prompt.strip().lower() not in skill_free_prompts:
                 error("Kein Skill gewählt (der Simulationsdienst misst den Erfolg je Skill)", block_id)
         elif parsed.skill_id not in skill_ids:
             error(f"Skill {parsed.skill_id} existiert nicht", block_id)

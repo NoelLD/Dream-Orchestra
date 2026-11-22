@@ -51,11 +51,11 @@ export const BLOCKS: { [K in WorkflowNodeType]: BlockMeta<K> } = {
   setActuator: {
     type: 'setActuator',
     label: 'Aktor setzen',
-    description: 'Schaltet Lampe oder Förderband',
+    description: 'Schaltet Lampe, Förderband oder Maschine; Fehlerpfad, wenn das Gerät nicht quittiert',
     icon: ToggleRight,
     accent: 'border-sky-600',
     iconBg: 'bg-sky-100 text-sky-900',
-    outputs: ['out'],
+    outputs: ['out', 'error'],
     hasInput: true,
     defaultData: () => ({ deviceId: '', value: true }),
   },

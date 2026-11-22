@@ -151,6 +151,12 @@ def _insert_device(conn: sqlite3.Connection, device_id: str, data: dict[str, Any
     )
 
 
+def insert_device(db: Database, device_id: str, data: dict[str, Any]) -> None:
+    """Gerät mit fester ID anlegen (Zellen-Geräte)."""
+    with db.connect() as conn:
+        _insert_device(conn, device_id, data)
+
+
 def create_device(db: Database, data: dict[str, Any]) -> dict[str, Any]:
     """Legt ein Gerät an; die ID wird aus dem Namen gebildet (bei Kollision -2, -3 …) und bleibt danach fest."""
     base = slugify(data["name"])

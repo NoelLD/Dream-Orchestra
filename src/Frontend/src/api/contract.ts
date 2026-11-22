@@ -196,7 +196,7 @@ export type StartRunRequest = z.infer<typeof StartRunRequestSchema>
 // ---------------------------------------------------------------------------
 export const DeviceKindSchema = z.enum(['sensor', 'actuator'])
 export type DeviceKind = z.infer<typeof DeviceKindSchema>
-export const DeviceTypeSchema = z.enum(['switch', 'button', 'number', 'lamp', 'conveyor'])
+export const DeviceTypeSchema = z.enum(['switch', 'button', 'number', 'lamp', 'conveyor', 'machine'])
 export type DeviceType = z.infer<typeof DeviceTypeSchema>
 
 /** Welche Art ein Gerätetyp hat (wie im Backend: Lampe und Förderband sind Aktoren). */
@@ -206,6 +206,7 @@ export const DEVICE_TYPE_KIND: Record<DeviceType, DeviceKind> = {
   number: 'sensor',
   lamp: 'actuator',
   conveyor: 'actuator',
+  machine: 'actuator',
 }
 export const DEVICE_TYPE_LABELS: Record<DeviceType, string> = {
   switch: 'Schalter',
@@ -213,6 +214,7 @@ export const DEVICE_TYPE_LABELS: Record<DeviceType, string> = {
   number: 'Zahlenwert',
   lamp: 'Lampe',
   conveyor: 'Förderband',
+  machine: 'Maschine',
 }
 
 export const DeviceProtocolSchema = z.enum(['virtual', 'mqtt', 'opcua'])

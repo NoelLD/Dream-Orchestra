@@ -71,7 +71,10 @@ export function RunLog({ pollError }: { pollError: Error | null }) {
                   {entry.apiStatus ? <span className={cn('rounded px-1.5 py-0.5 text-[11px] font-medium', apiStatusClass(entry.apiStatus))}>{entry.apiStatus}</span> : '–'}
                 </TableCell>
                 <TableCell className="text-xs">{formatDuration(entry.durationMs)}</TableCell>
-                <TableCell className="whitespace-normal text-xs">{entry.message}</TableCell>
+                <TableCell className="whitespace-normal text-xs">
+                  <ExecutionBadge message={entry.message} />
+                  {entry.message}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -79,4 +82,15 @@ export function RunLog({ pollError }: { pollError: Error | null }) {
       </div>
     </section>
   )
+}
+
+/** P4: Ausführungsart sichtbar machen – geskripteter Referenz-Controller (Zelle) oder Lauf im Simulationsdienst. */
+function ExecutionBadge({ message }: { message: string }) {
+  if (message.includes('geskriptet-')) {
+    return <span className="mr-1.5 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-800" title="Bewegung vom geskripteten Referenz-Controller der Zelle, nicht von Dream-1. Keine Credits.">Referenz-Controller</span>
+  }
+  if (/\brun_[a-z0-9]/.test(message)) {
+    return <span className="mr-1.5 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-900" title="Lauf im Simulationsdienst (Dream-1 im Modus real, sonst geskriptet).">Simulationslauf</span>
+  }
+  return null
 }

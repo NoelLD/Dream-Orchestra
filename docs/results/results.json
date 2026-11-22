@@ -1,0 +1,1637 @@
+{
+ "generated_at": "2026-11-22T11:28:57",
+ "base": "beta-main",
+ "tasks": [
+  "sort_round",
+  "sort_cube",
+  "cnc_load",
+  "cnc_unload"
+ ],
+ "task_names": {
+  "sort_round": "Sort round part",
+  "sort_cube": "Sort cube",
+  "cnc_load": "Load CNC",
+  "cnc_unload": "Unload CNC"
+ },
+ "models": [
+  {
+   "label": "expert",
+   "name": "Scripted expert",
+   "what": "reference that produced the training demos",
+   "prereg": true,
+   "k": 39,
+   "lo": 0.8711834051199223,
+   "hi": 0.9955732825922052,
+   "contact": 1,
+   "buckets": {
+    "success": 39,
+    "dropped": 0,
+    "not_released": 0,
+    "no_grasp": 1,
+    "action_error": 0
+   },
+   "tasks": {
+    "sort_round": 10,
+    "sort_cube": 10,
+    "cnc_load": 10,
+    "cnc_unload": 9
+   },
+   "scenes": [
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     true,
+     "collision"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ]
+   ],
+   "times": [
+    11.6,
+    11.6,
+    12.0,
+    12.0,
+    12.8,
+    12.8,
+    13.2,
+    13.2,
+    13.2,
+    13.2,
+    13.2,
+    13.2,
+    13.3,
+    13.4,
+    13.9,
+    13.9,
+    14.1,
+    14.4,
+    14.4,
+    14.5,
+    14.5,
+    14.6,
+    14.6,
+    15.2,
+    15.2,
+    15.5,
+    15.6,
+    15.9,
+    16.1,
+    19.9,
+    19.9,
+    20.1,
+    20.2,
+    20.9,
+    21.0,
+    21.1,
+    22.2,
+    22.6,
+    23.1
+   ],
+   "t_median": 14.5,
+   "within20": 31,
+   "within30": 39
+  },
+  {
+   "label": "beta-main",
+   "name": "Dream-1 beta (base)",
+   "what": "no fine-tune",
+   "prereg": true,
+   "k": 6,
+   "lo": 0.07061091708507435,
+   "hi": 0.2907262603902003,
+   "contact": 8,
+   "buckets": {
+    "success": 6,
+    "dropped": 12,
+    "not_released": 3,
+    "no_grasp": 19,
+    "action_error": 0
+   },
+   "tasks": {
+    "sort_round": 0,
+    "sort_cube": 2,
+    "cnc_load": 3,
+    "cnc_unload": 1
+   },
+   "scenes": [
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "not_released",
+     false,
+     "timeout_placed_not_released"
+    ],
+    [
+     "not_released",
+     false,
+     "timeout_placed_not_released"
+    ],
+    [
+     "not_released",
+     false,
+     "timeout_placed_not_released"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ]
+   ],
+   "times": [
+    19.0,
+    20.0,
+    29.6,
+    29.6,
+    30.4,
+    44.4
+   ],
+   "t_median": 29.6,
+   "within20": 2,
+   "within30": 4
+  },
+  {
+   "label": "beta-main2",
+   "name": "Base, second run",
+   "what": "noise floor of the base",
+   "prereg": true,
+   "k": 7,
+   "lo": 0.08745302996883066,
+   "hi": 0.3195029205439244,
+   "contact": 5,
+   "buckets": {
+    "success": 7,
+    "dropped": 10,
+    "not_released": 4,
+    "no_grasp": 19,
+    "action_error": 0
+   },
+   "tasks": {
+    "sort_round": 3,
+    "sort_cube": 0,
+    "cnc_load": 3,
+    "cnc_unload": 1
+   },
+   "scenes": [
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "not_released",
+     false,
+     "timeout_placed_not_released"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "not_released",
+     false,
+     "timeout_placed_not_released"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "not_released",
+     false,
+     "timeout_placed_not_released"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "not_released",
+     false,
+     "timeout_placed_not_released"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ]
+   ],
+   "times": [
+    27.8,
+    29.0,
+    36.0,
+    39.8,
+    40.0,
+    40.2,
+    42.0
+   ],
+   "t_median": 39.8,
+   "within20": 0,
+   "within30": 2,
+   "both": 1,
+   "both_faster": 1,
+   "win": 6,
+   "loss": 5,
+   "p": 1.0
+  },
+  {
+   "label": "ft-main",
+   "name": "Fine-tune c500",
+   "what": "160 cell demos, 500 steps",
+   "prereg": true,
+   "k": 14,
+   "lo": 0.2213433317104915,
+   "hi": 0.5049440300646263,
+   "contact": 17,
+   "buckets": {
+    "success": 14,
+    "dropped": 6,
+    "not_released": 1,
+    "no_grasp": 17,
+    "action_error": 2
+   },
+   "tasks": {
+    "sort_round": 2,
+    "sort_cube": 2,
+    "cnc_load": 7,
+    "cnc_unload": 3
+   },
+   "scenes": [
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "action_error",
+     true,
+     "action_error"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "not_released",
+     false,
+     "timeout_placed_not_released"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     true,
+     "success"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ]
+   ],
+   "times": [
+    18.0,
+    18.6,
+    19.0,
+    20.6,
+    22.4,
+    22.8,
+    23.2,
+    24.0,
+    24.4,
+    25.8,
+    26.4,
+    26.8,
+    27.0,
+    31.8
+   ],
+   "t_median": 23.6,
+   "within20": 3,
+   "within30": 13,
+   "both": 3,
+   "both_faster": 3,
+   "win": 11,
+   "loss": 3,
+   "p": 0.057373046875
+  },
+  {
+   "label": "ft-rep-main",
+   "name": "Fine-tune c500, replicate",
+   "what": "identical training, training noise",
+   "prereg": true,
+   "k": 17,
+   "lo": 0.28509168524815875,
+   "hi": 0.5780519956394001,
+   "contact": 15,
+   "buckets": {
+    "success": 17,
+    "dropped": 3,
+    "not_released": 0,
+    "no_grasp": 6,
+    "action_error": 14
+   },
+   "tasks": {
+    "sort_round": 5,
+    "sort_cube": 0,
+    "cnc_load": 10,
+    "cnc_unload": 2
+   },
+   "scenes": [
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "action_error",
+     true,
+     "action_error"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     true,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     true,
+     "action_error"
+    ],
+    [
+     "action_error",
+     true,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "action_error",
+     true,
+     "action_error"
+    ],
+    [
+     "action_error",
+     true,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "action_error",
+     true,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "action_error",
+     true,
+     "action_error"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "success",
+     true,
+     "success"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ]
+   ],
+   "times": [
+    18.6,
+    19.4,
+    19.4,
+    20.4,
+    22.0,
+    23.6,
+    24.0,
+    24.4,
+    24.6,
+    24.6,
+    24.8,
+    25.0,
+    32.2,
+    32.8,
+    33.4,
+    36.6,
+    43.4
+   ],
+   "t_median": 24.6,
+   "within20": 3,
+   "within30": 12,
+   "both": 3,
+   "both_faster": 1,
+   "win": 14,
+   "loss": 3,
+   "p": 0.012725830078125
+  },
+  {
+   "label": "ft-lr3-main",
+   "name": "Fine-tune, lr 3e-5",
+   "what": "learning rate 3x",
+   "prereg": true,
+   "k": 20,
+   "lo": 0.35199278797099753,
+   "hi": 0.6480072120290025,
+   "contact": 13,
+   "buckets": {
+    "success": 20,
+    "dropped": 5,
+    "not_released": 3,
+    "no_grasp": 4,
+    "action_error": 8
+   },
+   "tasks": {
+    "sort_round": 9,
+    "sort_cube": 0,
+    "cnc_load": 1,
+    "cnc_unload": 10
+   },
+   "scenes": [
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     true,
+     "success"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     true,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "action_error",
+     true,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     true,
+     "action_error"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "not_released",
+     true,
+     "timeout_placed_not_released"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "action_error",
+     true,
+     "action_error"
+    ],
+    [
+     "not_released",
+     false,
+     "timeout_placed_not_released"
+    ],
+    [
+     "not_released",
+     true,
+     "timeout_placed_not_released"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ]
+   ],
+   "times": [
+    16.8,
+    17.0,
+    17.0,
+    17.0,
+    17.0,
+    17.0,
+    17.0,
+    17.0,
+    17.4,
+    18.6,
+    18.8,
+    19.0,
+    22.6,
+    23.4,
+    23.6,
+    23.6,
+    23.8,
+    23.8,
+    24.0,
+    25.6
+   ],
+   "t_median": 18.7,
+   "within20": 12,
+   "within30": 20,
+   "both": 1,
+   "both_faster": 1,
+   "win": 19,
+   "loss": 5,
+   "p": 0.006610751152038574
+  }
+ ],
+ "spend": {
+  "jobs": [
+   {
+    "name": "yam-cells-c500",
+    "status": "succeeded",
+    "usd": 100.0
+   },
+   {
+    "name": "yam-cells-c500-rep",
+    "status": "succeeded",
+    "usd": 100.0
+   },
+   {
+    "name": "yam-cells-c500-lr3",
+    "status": "succeeded",
+    "usd": 100.0
+   },
+   {
+    "name": "yam-cells-c1000",
+    "status": "running",
+    "usd": 200.0
+   },
+   {
+    "name": "yam-cells-c500-b05",
+    "status": "succeeded",
+    "usd": 100.0
+   },
+   {
+    "name": "yam-cells-c500-rep2",
+    "status": "running",
+    "usd": 100.0
+   },
+   {
+    "name": "yam-cells-v2-c500",
+    "status": "not submitted yet (chain still checking data)",
+    "usd": 0.0,
+    "pending": 100.0
+   }
+  ],
+  "evals": {
+   "beta-main": 1.011,
+   "beta-main2": 1.033,
+   "calib-beta-r20": 0.193,
+   "calib-beta-r30": 0.325,
+   "calib-ft-r10": 0.216,
+   "calib-ft-r20": 0.37,
+   "calib-ft-r30": 0.714,
+   "ft-b05-main": 0.655,
+   "ft-lr3-main": 1.481,
+   "ft-main": 1.8,
+   "ft-rep-main": 1.803
+  },
+  "credit": 1000.0,
+  "dev": {
+   "calls": 1195,
+   "phases": {
+    "Idea, research, team name": 12.41,
+    "Simulation, cells, scripted expert, API": 80.11,
+    "Fine-tune data, training gates, evaluation, pages, integration": 38.85
+   },
+   "usd": 131.37,
+   "out_m": 1.27,
+   "cache_read_m": 302.4
+  }
+ },
+ "queue": [
+  {
+   "label": "ft-lr3-main",
+   "name": "Fine-tune, lr 3e-5",
+   "eta": "~10:40",
+   "done": true
+  },
+  {
+   "label": "beta-main2",
+   "name": "Base, second run",
+   "eta": "~11:25",
+   "done": true
+  },
+  {
+   "label": "ft-b05-main",
+   "name": "Fine-tune, 50 % base data",
+   "eta": "~12:10",
+   "done": false
+  },
+  {
+   "label": "fruit-forget",
+   "name": "Forgetting check (banana)",
+   "eta": "~13:10",
+   "done": false
+  },
+  {
+   "label": "ft-rep-g15",
+   "name": "Replicate, gripper clip 0.15",
+   "eta": "~13:55",
+   "done": false
+  },
+  {
+   "label": "ft-c1000-main",
+   "name": "Fine-tune c1000",
+   "eta": "~14:40",
+   "done": false
+  },
+  {
+   "label": "ft-rep2-main",
+   "name": "Fine-tune c500, 3rd training",
+   "eta": "~15:25",
+   "done": false
+  },
+  {
+   "label": "ft-v2-main",
+   "name": "Fine-tune, 320 demos",
+   "eta": "~16:10",
+   "done": false
+  }
+ ],
+ "public_url": "https://cell-finetune-results.martinkaiser-bln.workers.dev"
+}

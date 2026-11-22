@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useReactFlow } from '@xyflow/react'
 import { CheckCircle2, Copy, Download, FilePlus, FileUp, FolderOpen, Pause, Play, RotateCcw, Save, StepForward } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -14,7 +15,7 @@ import { isRunActive, useRunAction, useStartRun } from '@/run/useRun'
 import { estimateCredits } from '../estimate'
 import { toDocument } from '../flow'
 import { parseWorkflowJson, serializeWorkflow } from '../io'
-import { SAMPLE_WORKFLOW } from '../sample'
+import { SAMPLES } from '../sample'
 import { POLL_INTERVAL_OPTIONS, selectIsDirty, useEditor, useRunStore } from '../store'
 import { validateWorkflow } from '../validate'
 import { WorkflowsDialog } from './WorkflowsDialog'
@@ -31,6 +32,7 @@ function download(filename: string, text: string) {
 const fileName = (name: string) => `${name.trim().replace(/[^\p{L}\p{N}_-]+/gu, '_') || 'workflow'}.json`
 
 export function Toolbar() {
+  const { fitView } = useReactFlow()
   const name = useEditor((s) => s.name)
   const setName = useEditor((s) => s.setName)
   const setIssues = useEditor((s) => s.setIssues)
@@ -172,9 +174,29 @@ export function Toolbar() {
           e.target.value = ''
         }}
       />
-      <Button size="sm" variant="ghost" onClick={() => confirmDiscard() && load(SAMPLE_WORKFLOW)} disabled={active}>
-        <RotateCcw aria-hidden /> Beispiel laden
-      </Button>
+      <Select
+        value=""
+        disabled={active}
+        onValueChange={(id) => {
+          const sample = SAMPLES.find((s) => s.id === id)
+          if (sample && confirmDiscard()) {
+            load(sample.doc)
+            requestAnimationFrame(() => void fitView({ padding: 24, maxZoom: 1.1 }))
+          }
+        }}
+      >
+        <SelectTrigger size="sm" className="h-8 w-auto gap-1.5 border-0 shadow-none" aria-label="Beispiel laden" data-testid="sample-select">
+          <RotateCcw aria-hidden className="size-4" />
+          <SelectValue placeholder="Beispiel laden" />
+        </SelectTrigger>
+        <SelectContent>
+          {SAMPLES.map((s) => (
+            <SelectItem key={s.id} value={s.id}>
+              {s.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
       <div className="ml-auto flex items-center gap-2">
         <span

@@ -5,12 +5,13 @@ die Sensoren über die API, der Ablauf schaltet die Aktoren. Ein echter MQTT- od
 Protokoll Werte lesen und schreiben; Engine und Workflows sprechen weiter nur `list/get/set`.
 """
 
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
 from app.db import repo
 from app.db.database import Database
-from app.errors import ConflictError, InvalidError, NotFoundError
+from app.errors import ConflictError, InvalidError, NotFoundError, UpstreamError
 from app.schemas.devices import ACTUATOR_TYPES, DeviceIn, DeviceKind, DeviceType, kind_of
 
 __all__ = [
@@ -112,6 +113,42 @@ class DeviceRegistry(VirtualAdapter):
     def __init__(self, db: Database) -> None:
         super().__init__(())
         self.db = db
+        # Wächter: Grund, warum ein Sensor gerade keinen gültigen Wert hat (z. B. Zelle getrennt), sonst None
+        self.guards: list[Callable[[str], str | None]] = []
+        # Quittung: wird nach dem Schalten eines Aktors im Ablauf abgewartet (z. B. Zellen-Aktion)
+        self.apply_hooks: list[Callable[[Device], Awaitable[None]]] = []
+
+    def read(self, device_id: str) -> Device:
+        """Wert für den Ablauf: wie `get`, aber Fehler statt eines veralteten Werts."""
+        for guard in self.guards:
+            if (reason := guard(device_id)) is not None:
+                raise UpstreamError(reason, status_code=503, code="sensor_unavailable")
+        return self.get(device_id)
+
+    async def apply(self, device_id: str, value: bool | float) -> Device:
+        """Aktor im Ablauf schalten und auf die Quittung warten; Fehler gehen an den Block (Fehlerpfad)."""
+        device = self.set(device_id, value)
+        for hook in self.apply_hooks:
+            await hook(device)
+        return device
+
+    def ensure(self, devices: Iterable[Device]) -> None:
+        """Fehlende Geräte mit fester ID anlegen (vorhandene und vom Nutzer geänderte bleiben)."""
+        for d in devices:
+            if d.id not in self._devices:
+                repo.insert_device(
+                    self.db,
+                    d.id,
+                    {
+                        "name": d.name,
+                        "type": d.type.value,
+                        "config": {"protocol": "virtual"},
+                        "unit": None,
+                        "min": None,
+                        "max": None,
+                    },
+                )
+                self._devices[d.id] = d
 
     def load(self) -> None:
         """Nach `init_schema` aufrufen: legt bei leerer Tabelle den Startbestand an und lädt alle Geräte."""

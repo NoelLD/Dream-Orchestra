@@ -16,6 +16,7 @@ class DeviceType(StrEnum):
     NUMBER = "number"  # Zahlenwert
     LAMP = "lamp"  # Lampe
     CONVEYOR = "conveyor"  # Förderband an/aus
+    MACHINE = "machine"  # Maschine: an = Zyklus starten (Zellen-Geräte)
 
 
 class DeviceKind(StrEnum):
@@ -23,7 +24,7 @@ class DeviceKind(StrEnum):
     ACTUATOR = "actuator"
 
 
-ACTUATOR_TYPES = {DeviceType.LAMP, DeviceType.CONVEYOR}
+ACTUATOR_TYPES = {DeviceType.LAMP, DeviceType.CONVEYOR, DeviceType.MACHINE}
 
 
 def kind_of(device_type: DeviceType) -> DeviceKind:

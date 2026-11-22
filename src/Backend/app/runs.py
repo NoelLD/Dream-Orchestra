@@ -68,6 +68,7 @@ class RunRegistry:
             devices={d.id: d.kind for d in self.devices.list()},
             skill_ids={s["id"] for s in repo.list_skills(self.db)},
             require_skill=self.dream.mode != "mock",
+            skill_free_prompts=getattr(self.dream, "cell_prompts", frozenset()),
         )
 
     def start(self, workflow_id: int | None, definition: WorkflowDefinition | None = None) -> int:
