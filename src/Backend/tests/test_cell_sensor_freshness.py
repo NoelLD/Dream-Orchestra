@@ -42,10 +42,10 @@ async def test_invalid_snapshot_cannot_reuse_completed_machine(invalid_snapshot:
         with pytest.raises(UpstreamError, match="nicht verfügbar"):
             registry.read("zelle-maschine-fertig")
 
-        snapshot = {"status": "running", "sensors": {"machine_done": False}}
+        snapshot = {"status": "running", "sensors": {"machine_done": False, "stack_light": None}}
         await bridge.poll_once()
         assert registry.read("zelle-maschine-fertig").value is False
-        assert bridge.unavailable("zelle-ampel-rot") is None
+        assert bridge.unavailable("zelle-ampel-rot") is None  # Ampel aus, aber gültig
     finally:
         await api.aclose()
 

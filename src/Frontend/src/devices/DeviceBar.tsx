@@ -170,7 +170,7 @@ export function DeviceBar() {
               {actuators.map((d) => (
                 <li key={d.id} className="flex items-center justify-between gap-2" data-testid={`device-${d.id}`}>
                   <DeviceName device={d} />
-                  <ActuatorDisplay device={d} />
+                  {d.available === false ? <Unavailable device={d} /> : <ActuatorDisplay device={d} />}
                 </li>
               ))}
             </ul>

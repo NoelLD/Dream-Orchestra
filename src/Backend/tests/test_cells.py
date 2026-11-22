@@ -249,7 +249,8 @@ async def test_stale_sensor_is_unavailable_not_old() -> None:
     await bridge.poll_once()
     with pytest.raises(UpstreamError, match="nicht verfügbar"):
         registry.read("zelle-maschine-fertig")
-    assert registry.read("zelle-ampel-rot").value is False  # actuators have no freshness
+    with pytest.raises(UpstreamError, match="nicht verfügbar"):  # Codex #3: Ampel ohne Zelle gilt nicht
+        registry.read("zelle-ampel-rot")
 
 
 @pytest.mark.asyncio
@@ -397,7 +398,7 @@ def test_devices_api_reports_unavailable_cell_sensor(tmp_path: pathlib.Path) -> 
         devices = {d["id"]: d for d in client.get("/api/devices").json()}
     sensor = devices["zelle-maschine-fertig"]
     assert sensor["available"] is False and "nicht verfügbar" in sensor["unavailable_reason"]
-    assert devices["zelle-ampel-rot"]["available"] is True  # actuators have no freshness
+    assert devices["zelle-ampel-rot"]["available"] is False  # Codex #3: auch Aktoren der Zelle
     assert devices["lichtschranke"]["available"] is True
 
 
@@ -494,3 +495,54 @@ async def test_session_start_survives_a_slow_simulation() -> None:
     )
     run = await finish(dream, await dream.start(skill="cnc_load", prompt="", checkpoint=None))
     assert run.success and hiccups["left"] == 0
+
+
+@pytest.mark.asyncio
+async def test_lamps_mirror_the_cell_and_go_unavailable_without_it() -> None:
+    """Codex #3: Ampel und Maschine zeigen bei Ausfall „nicht verfügbar“ statt eines alten Zustands."""
+    fake = FakeCells()
+    api = SimulationApi("http://sim", transport=httpx.MockTransport(fake))
+    await api.request("POST", "/cells/cnc/session")
+    registry, bridge = registry_with(api)
+    fake.session["sensors"]["stack_light"] = "green"  # type: ignore[index]
+    await bridge.poll_once()
+    assert registry.get("zelle-ampel-gruen").value is True and registry.get("zelle-ampel-rot").value is False
+    assert bridge.unavailable("zelle-ampel-gruen") is None
+    await api.request("DELETE", "/cells/session")
+    await bridge.poll_once()
+    for device_id in ("zelle-ampel-gruen", "zelle-ampel-rot", "zelle-cnc-maschine"):
+        assert "nicht verfügbar" in (bridge.unavailable(device_id) or "")
+
+
+@pytest.mark.asyncio
+async def test_late_answer_with_equal_sim_time_does_not_overwrite() -> None:
+    """Codex #2: gleiche Sim-Zeit (Simulation rundet auf 0,1 s), aber früher abgeschickte Abfrage -> verwerfen."""
+    fake = FakeCells()
+    api = SimulationApi("http://sim", transport=httpx.MockTransport(fake))
+    await api.request("POST", "/cells/cnc/session")
+    registry, bridge = registry_with(api)
+    sensors = {"machine_done": False, "machine_running": True}
+    old_seq, new_seq = next(bridge._seq), next(bridge._seq)
+    bridge._mirror({"status": "running", "sim_seconds": 10.0, "sensors": sensors}, new_seq)
+    bridge._mirror({"status": "running", "sim_seconds": 10.0, "sensors": {**sensors, "machine_done": True}}, old_seq)
+    assert registry.read("zelle-maschine-fertig").value is False
+
+
+@pytest.mark.asyncio
+async def test_frozen_simulation_goes_stale() -> None:
+    """Codex #2: Antworten ohne Fortschritt der Sim-Zeit verlängern die Frische nicht."""
+    import time as _time
+
+    fake = FakeCells()
+    api = SimulationApi("http://sim", transport=httpx.MockTransport(fake))
+    await api.request("POST", "/cells/cnc/session")
+    _registry, bridge = registry_with(api)
+    frozen = {"status": "running", "sim_seconds": 3.0, "sensors": {"machine_done": False}}
+    bridge._mirror(frozen, next(bridge._seq))
+    assert bridge._last_ok is not None
+    bridge._last_ok -= bridge.max_age_s + 1  # so tun, als sei die letzte echte Bewegung lange her
+    bridge._mirror(frozen, next(bridge._seq))  # gleiche Sim-Zeit: keine neue Frische
+    assert "nicht verfügbar" in (bridge.unavailable("zelle-maschine-fertig") or "")
+    bridge._mirror({**frozen, "sim_seconds": 3.5}, next(bridge._seq))
+    assert bridge.unavailable("zelle-maschine-fertig") is None
+    assert _time.monotonic() - bridge._last_ok < 1

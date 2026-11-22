@@ -41,6 +41,7 @@ _SPEC = [  # (ID, Name, Typ, Sensor in der Sitzung oder None für reine Aktoren)
 CELL_DEVICES: dict[str, tuple[Device, str | None]] = {
     device_id: (Device(device_id, name, device_type, False), sensor) for device_id, name, device_type, sensor in _SPEC
 }
+LAMPS = {"zelle-ampel-rot": "red", "zelle-ampel-gruen": "green"}  # Ampel-Gerät -> Wert von stack_light in der Sitzung
 ACTIONS = {  # Aktor -> (Aktion bei an, Aktion bei aus)
     "zelle-cnc-maschine": ("cycle_start", None),
     "zelle-ampel-rot": ("light_red", "light_off"),
@@ -240,34 +241,51 @@ class CellBridge:
         self._last_ok: float | None = None
         self._fresh_sensors: set[str] = set()
         self._last_sim_s = -1.0  # Simulationszeit des zuletzt gespiegelten Schnappschusses
+        self._seq = itertools.count(1)  # Nummer je Abfrage, vergeben beim Absenden
+        self._applied_seq = 0  # Nummer der zuletzt gespiegelten Abfrage
         self._last_error = "noch keine Verbindung zur Zelle"
         self._task: asyncio.Task[None] | None = None
 
     async def poll_once(self) -> None:
+        seq = next(self._seq)
         try:
             session = await self.api.request("GET", "/cells/session")
         except UpstreamError as exc:
             self._last_ok = None
             self._last_error = "keine Zellen-Sitzung" if exc.code == "no_session" else exc.detail
             return
-        self._mirror(session)
+        self._mirror(session, seq)
 
-    def _mirror(self, session: Any) -> None:
+    def _mirror(self, session: Any, seq: int | None = None) -> None:
         """Sensoren eines Schnappschusses in die Geräte schreiben. Ein älterer Schnappschuss (z. B. eine Abfrage, die
         vor einem Maschinenstart losging und danach ankommt) überschreibt keinen neueren."""
         if not isinstance(session, dict) or session.get("status") != "running":
             self._last_ok = None
             self._last_error = "Zellen-Sitzung ist nicht bereit"
             return
+        if seq is not None:  # Antwort auf eine früher abgeschickte Abfrage kommt spät: verwerfen (Codex #2)
+            if seq < self._applied_seq:
+                return
+            self._applied_seq = seq
         sim_s = session.get("sim_seconds")
+        progressed = True  # Frische = die Simulation rechnet weiter, nicht nur: es kam eine Antwort
         if isinstance(sim_s, int | float):
             if self._last_sim_s - 5.0 < sim_s < self._last_sim_s:  # leicht älter: verwerfen (viel älter = neue Sitzung)
                 return
+            progressed = sim_s != self._last_sim_s
             self._last_sim_s = float(sim_s)
         sensors = session.get("sensors") or {}
         if not isinstance(sensors, dict):
             sensors = {}
         self._fresh_sensors = {name for name, value in sensors.items() if isinstance(value, bool)}
+        if "stack_light" in sensors:  # Ampel spiegelt die echte Zelle (None = aus)
+            self._fresh_sensors.add("stack_light")
+            for device_id, color in LAMPS.items():
+                try:
+                    if self.devices.get(device_id).value != (sensors["stack_light"] == color):
+                        self.devices.set(device_id, sensors["stack_light"] == color)
+                except Exception:  # Gerät gelöscht
+                    pass
         for device_id, (_, sensor) in CELL_DEVICES.items():
             if sensor and sensor in self._fresh_sensors:
                 try:
@@ -277,19 +295,21 @@ class CellBridge:
                 value = bool(sensors[sensor])
                 if current is None or current.value != value:
                     self.devices.set(device_id, value)
-        self._last_ok = time.monotonic()
+        if progressed or self._last_ok is None:
+            self._last_ok = time.monotonic()
 
     def unavailable(self, device_id: str) -> str | None:
-        """Grund, warum ein Zellen-Sensor gerade keinen gültigen Wert hat, sonst None (Wächter im Gerätestamm)."""
-        if CELL_DEVICES.get(device_id, (None, None))[1] is None:
+        """Grund, warum ein Zellen-Gerät (Sensor, Maschine, Ampel) gerade keinen gültigen Wert hat, sonst None."""
+        if device_id not in CELL_DEVICES:
             return None
+        sensor = CELL_DEVICES[device_id][1] or ("stack_light" if device_id in LAMPS else None)
         if self._last_ok is None:
-            return f"Sensor {device_id} nicht verfügbar: {self._last_error}"
-        if CELL_DEVICES[device_id][1] not in self._fresh_sensors:
-            return f"Sensor {device_id} nicht verfügbar: kein gültiger Wert in der letzten Abfrage"
+            return f"{device_id} nicht verfügbar: {self._last_error}"
+        if sensor is not None and sensor not in self._fresh_sensors:
+            return f"{device_id} nicht verfügbar: kein gültiger Wert in der letzten Abfrage"
         age = time.monotonic() - self._last_ok
         if age > self.max_age_s:
-            return f"Sensor {device_id} nicht verfügbar: letzter Wert {age:.1f} s alt"
+            return f"{device_id} nicht verfügbar: letzter Wert {age:.1f} s alt"
         return None
 
     async def _loop(self) -> None:
@@ -317,11 +337,12 @@ class CellBridge:
             return
         deadline = time.monotonic() + CYCLE_ACK_S
         while time.monotonic() < deadline:
+            seq = next(self._seq)
             session = await self.api.request("GET", "/cells/session")
             if ((session or {}).get("sensors") or {}).get("machine_running"):
                 # Quittung: die Geräte sofort auf diesen Stand bringen, damit ein "fertig" vom vorigen Zyklus
                 # nicht als frisch gilt, bevor die nächste Abfrage kommt
-                self._mirror(session)
+                self._mirror(session, seq)
                 return
             for event in _after((session or {}).get("events") or [], marker):
                 if event.get("gate") is False:
