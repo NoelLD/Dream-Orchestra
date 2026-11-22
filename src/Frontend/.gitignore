@@ -25,3 +25,5 @@ e2e/screenshots
 *.njsproj
 *.sln
 *.sw?
+.vercel
+.env*

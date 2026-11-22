@@ -41,3 +41,4 @@ desktop.ini
 
 # Lokale Claude-Code-Einstellungen
 .claude/settings.local.json
+.vercel
