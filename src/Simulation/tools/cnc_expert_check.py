@@ -22,7 +22,7 @@ import numpy as np  # noqa: E402
 import yam_env  # noqa: E402
 
 from app.cnc import CellController, cell_xml  # noqa: E402
-from app.cnc_expert import TASKS, run_episode  # noqa: E402
+from app.cnc_expert import ALL_TASKS as TASKS, run_episode  # noqa: E402
 
 _original = yam_env.build_xml
 

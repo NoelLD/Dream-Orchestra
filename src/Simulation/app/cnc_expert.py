@@ -18,8 +18,8 @@ from dataclasses import dataclass, field
 import mujoco
 import numpy as np
 
-from .cnc import (FIN_BOX, FIN_HALF_H, KLT_HALF, PARK, RAW_HALF, SEAT_Z, SORT_BOX, TABLE_Z, TRAY_OUT,
-                  CellController)
+from .cnc import (FIN_BOX, FIN_HALF_H, KLT_HALF, PARK, RAW_HALF, RAW_STAGE, SEAT_Z, SORT_BOX, STAGE_TOP, TABLE_Z,
+                  TRAY_OUT, CellController)
 
 TASKS = {
     "sort_round": {"cell": "conveyor", "arm": "right", "part": "cyl_part_0", "target": SORT_BOX["right"],
@@ -35,6 +35,14 @@ TASKS = {
                    "rest_z": TABLE_Z + 0.008 + FIN_HALF_H, "radius": 0.04,
                    "prompt": "put the finished part in the green box"},
 }
+# Transfer test (22.11.): similar but untrained tasks. Kept out of TASKS so recording, the queue's evaluations
+# and the reports (which iterate TASKS) stay unchanged; look tasks up by name in ALL_TASKS.
+TRANSFER_TASKS = {
+    "cnc_return": {"cell": "cnc", "arm": "left", "part": "raw_part_0", "target": RAW_STAGE,
+                   "rest_z": STAGE_TOP + RAW_HALF[2], "radius": 0.03,
+                   "prompt": "put the metal block from the machine tray on the grey stand"},
+}
+ALL_TASKS = TASKS | TRANSFER_TASKS
 PENETRATION_M = 0.0005  # executed motion: any real contact deeper than this counts as a collision
 CLEARANCE_M = 0.006  # planning: poses and paths must keep this distance from the cell
 
@@ -209,12 +217,14 @@ class CellRun:
 def prepare_scene(env, task: str, rng: np.random.Generator, ctrl: CellController) -> None:
     """Randomize the start state for this task (seeded)."""
     d = env.data
-    spec = TASKS[task]
-    if task == "cnc_load":
+    spec = ALL_TASKS[task]
+    if task in ("cnc_load", "cnc_return"):
         d.joint("fin_part_0_free").qpos[:3] = PARK  # tray empty: the machine waits for a raw part
     q = d.joint(f"{spec['part']}_free").qpos
-    if TASKS[task]["cell"] == "conveyor":  # single-task run: only this arm's kind on the belt, lateral jitter
-        own = "cyl_part" if TASKS[task]["arm"] == "right" else "raw_part"
+    if task == "cnc_return":  # reverse of cnc_load: the raw part starts on the tray, the stand is empty
+        q[:3] = [TRAY_OUT[0], TRAY_OUT[1], SEAT_Z + RAW_HALF[2] + 0.001]
+    if spec["cell"] == "conveyor":  # single-task run: only this arm's kind on the belt, lateral jitter
+        own = "cyl_part" if spec["arm"] == "right" else "raw_part"
         x = -0.30
         for i in range(env.model.nbody):
             name = env.model.body(i).name or ""
@@ -238,7 +248,7 @@ def prepare_scene(env, task: str, rng: np.random.Generator, ctrl: CellController
 
 def task_done(env, task: str, ctrl: CellController | None = None, part: str | None = None) -> bool:
     """Part resting inside the target zone at its resting height (released and still)."""
-    spec = TASKS[task]
+    spec = ALL_TASKS[task]
     body = env.data.body(part or spec["part"])
     p = body.xpos
     if spec["cell"] == "conveyor":  # inside the box's walls (the part may slide to a wall after release)
@@ -258,7 +268,7 @@ def run_episode(env, task: str, seed: int, ctrl: CellController | None = None, f
                 part: str | None = None) -> Episode:
     """Plan and execute one demonstration. fresh=True randomizes a freshly reset cell; fresh=False continues the
     current cell state (e.g. unloading the part the machine just finished). The caller records frames via env.step."""
-    spec = dict(TASKS[task])
+    spec = dict(ALL_TASKS[task])
     if part:
         spec["part"] = part
     rng = np.random.default_rng(seed)
@@ -285,7 +295,7 @@ def run_episode(env, task: str, seed: int, ctrl: CellController | None = None, f
     part = spec["part"]
     p = env.data.body(part).xpos.copy()  # noqa: F841 (re-read below after the hold)
     run.watch, run.watch_z0 = part, float(p[2])
-    drop = {"cnc_load": 0.012, "cnc_unload": 0.035}.get(task, 0.05)
+    drop = {"cnc_load": 0.012, "cnc_return": 0.012, "cnc_unload": 0.035}.get(task, 0.05)
     yaws = (0.0, np.pi / 2)  # into a crate: release above the walls' reach of the fingers
     goal_xy = spec["target"] + rng.uniform(-0.008, 0.008, size=2)
     if spec["cell"] == "conveyor":  # pick the free slot in the box (farthest from parts already in it)

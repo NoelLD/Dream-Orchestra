@@ -24,7 +24,7 @@ import pyarrow.parquet as pq  # noqa: E402
 import yam_env  # noqa: E402
 
 from app.cnc import CellController, cell_xml  # noqa: E402
-from app.cnc_expert import TASKS, run_episode  # noqa: E402
+from app.cnc_expert import ALL_TASKS, TASKS, run_episode  # noqa: E402
 from app.embodiment import CAMERAS  # noqa: E402
 from record_dataset import FPS, Recorder, write_video  # noqa: E402
 
@@ -37,7 +37,7 @@ def task_for(seed: int) -> str:
 
 
 def make_env(task: str):
-    yam_env.build_xml = lambda: cell_xml(_original_xml(), TASKS[task]["cell"])
+    yam_env.build_xml = lambda: cell_xml(_original_xml(), ALL_TASKS[task]["cell"])
     try:
         return yam_env.YamEnv()
     finally:

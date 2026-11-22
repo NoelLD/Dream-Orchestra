@@ -7,7 +7,7 @@ Results append to /data/evals/cells/<label>.jsonl (one line per task x seed; fin
 videos for --video seeds to /data/evals/cells/video/<label>/<task>-<seed>.mp4. Report: tools/eval_cells_report.py.
 
 Same scenes for every model: cell + prepare_scene(default_rng(seed)) exactly as the expert's training episodes, but
-evaluation seeds stay < 1000 (training used 4000+). Same prompts as training (TASKS[task]["prompt"]).
+evaluation seeds stay < 1000 (training used 4000+). Same prompts as training (ALL_TASKS[task]["prompt"]).
 Per episode we measure what the Dream SDK does not report:
   success      cnc_expert.task_done (part resting in the target zone, still) AND the arm's gripper open (> 0.5)
                - checked every 4 sim steps
@@ -41,7 +41,7 @@ import numpy as np  # noqa: E402
 from PIL import Image  # noqa: E402
 
 from app.cnc import CellController  # noqa: E402
-from app.cnc_expert import TASKS, Planner, prepare_scene, run_episode, task_done  # noqa: E402
+from app.cnc_expert import ALL_TASKS, TASKS, Planner, prepare_scene, run_episode, task_done  # noqa: E402
 from app.render import SmallRenderer  # noqa: E402
 from record_cells import make_env  # noqa: E402
 from record_dataset import write_video  # noqa: E402
@@ -76,8 +76,8 @@ class Episode:
         self.env = make_env(task)
         self.ctrl = CellController(self.env)
         prepare_scene(self.env, task, np.random.default_rng(seed), self.ctrl)
-        self.part = TASKS[task]["part"]
-        self.planner = Planner(self.env, TASKS[task]["arm"], np.random.default_rng(0))
+        self.part = ALL_TASKS[task]["part"]
+        self.planner = Planner(self.env, ALL_TASKS[task]["arm"], np.random.default_rng(0))
         self.z0 = float(self.env.data.body(self.part).xpos[2])
         self.steps = 0
         self.max_lift = 0.0
@@ -92,7 +92,7 @@ class Episode:
         # release / drop (added 22.11. 10:15, exploratory, after Martin saw lower drops in a video): when the arm's
         # gripper opens after the part was lifted, follow the part for 1.5 s: drop = release height - lowest point,
         # fall speed = fastest downward part speed in that window
-        self.arm = TASKS[task]["arm"]
+        self.arm = ALL_TASKS[task]["arm"]
         self.was_open = True
         self.lifted = False
         self.releases: list[dict] = []
@@ -142,7 +142,7 @@ class Episode:
                 self.video.append(np.concatenate([frames["top"], frames["left"], frames["right"]], axis=1))
             placed = task_done(self.env, self.task, self.ctrl, self.part)
             self.placed_seen = self.placed_seen or placed
-            released = self.env.state()[TASKS[self.task]["arm"]][6] > RELEASED
+            released = self.env.state()[ALL_TASKS[self.task]["arm"]][6] > RELEASED
             self.streak = self.streak + 1 if (placed and released) else 0  # resting AND let go, stably
             if self.streak >= HOLD_CHECKS:
                 self.done_at = (self.steps - (HOLD_CHECKS - 1) * CHECK_EVERY - self.t0) / SIM_HZ
@@ -210,7 +210,7 @@ def run_dream(task: str, seed: int, checkpoint: str, rate: float, timeout_s: flo
 
     gateway = os.environ.get("DREAM_GATEWAY_URL", "https://api.dreamlabs.ai")
     ep = Episode(task, seed, video)
-    prompt = TASKS[task]["prompt"]
+    prompt = ALL_TASKS[task]["prompt"]
     windows = {name: deque(maxlen=dc.FRAMES) for name in dc.VIDEO_ROLES}
     calls, row_steps, status, error, policy, restarts = 0, [], "timeout", None, None, 0
     grip_clipped = 0  # rows of accepted chunks whose gripper was clipped beyond the vendor's 0.05 (amendment 22.11.)

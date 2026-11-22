@@ -600,6 +600,14 @@ prices ($4 / $20 per million input / output tokens, $0.20 cache reads), from the
 billed depends on the plan. Codex and Grok reviews are not included.</p>
 <div class="tbl-wrap"><table id="devtbl"><thead><tr><th>Phase</th><th class="r">US$ (list price)</th></tr></thead><tbody></tbody></table></div>
 
+<div class="note"><b>One-time versus per run.</b> A fine-tune is paid once ($100–200) and then belongs to the robot
+type; each later run costs only Dream's call tariff (here about 3–5 cents per scene). Development is a one-time cost
+too. The scripted expert is also reusable and costs nothing per run (39 of 40), but it has to be programmed for every
+new cell and task; Dream-1 needs only demonstrations, which the expert produced here.
+<br><br><b>How flexible is the fine-tune?</b> Measured: on scene layouts it never saw (test seeds 0–9, training 4000+)
+it solves 14–20 of 40 instead of 6–7. Not measured yet: transfer to a new but similar task (another part or target);
+all four test tasks were in training. Whether it forgets skills outside the cells is the forgetting check below.</div>
+
 <h2>Still running</h2>
 <p class="muted">Strictly one Dream session at a time. Last start 16:25, done by about 16:30. Times are estimates.</p>
 <ul class="queue">
