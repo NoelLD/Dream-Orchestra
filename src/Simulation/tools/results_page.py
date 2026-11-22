@@ -118,7 +118,45 @@ def spending() -> dict:
         tot = sum((json.loads(x).get("cost_usd") or 0) for x in f.read_text().splitlines() if x.strip())
         if tot:
             evals[f.stem] = round(tot, 3)
-    return {"jobs": jobs, "evals": evals, "credit": 1000.0}
+    return {"jobs": jobs, "evals": evals, "credit": 1000.0, "dev": claude_dev_cost()}
+
+
+# Claude Code session logs of this project (local only). API list prices per 1M tokens (claude-api skill, 2026-11):
+# input, output, cache read; cache writes 1.25x input (5 min) or 2x input (1 h).
+CLAUDE_LOGS = Path.home() / ".claude/projects/-Users-marty-claude-projects-hackathons-2026-robotix-dreamlabs-hack"
+CLAUDE_PRICES = {"claude-opus-5-5": (4.0, 20.0, 0.20), "claude-sonnet-5-5": (2.0, 10.0, 0.10), "claude-haiku-5-5": (0.10, 0.50, 0.01)}
+DEV_PHASES = [("2026-11-21T14:27", "Idea, research, team name"),  # UTC boundaries (= 15:27 / 03:47 CET)
+              ("2026-11-22T01:47", "Simulation, cells, scripted expert, API"),
+              ("9999", "Fine-tune data, training gates, evaluation, pages, integration")]
+
+
+def claude_dev_cost() -> dict:
+    """List-price equivalent of the Claude Code work, deduplicated per API response, split into phases."""
+    seen, phases, calls, tokens = set(), {name: 0.0 for _, name in DEV_PHASES}, 0, {"out": 0, "cache_read": 0}
+    for f in CLAUDE_LOGS.glob("**/*.jsonl"):
+        for line in f.open(errors="ignore"):
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            m = d.get("message") or {}
+            u, mid = m.get("usage"), m.get("id")
+            if not u or not mid or (mid, d.get("requestId")) in seen or m.get("model") not in CLAUDE_PRICES:
+                continue
+            seen.add((mid, d.get("requestId")))
+            i, o, cr = CLAUDE_PRICES[m["model"]]
+            cc = u.get("cache_creation") or {}
+            w1h = cc.get("ephemeral_1h_input_tokens", 0)
+            w5 = cc.get("ephemeral_5m_input_tokens", 0) if cc else u.get("cache_creation_input_tokens", 0)
+            usd = (u.get("input_tokens", 0) * i + u.get("output_tokens", 0) * o + u.get("cache_read_input_tokens", 0) * cr
+                   + w5 * i * 1.25 + w1h * i * 2) / 1e6
+            ts = d.get("timestamp", "")
+            phases[next(name for end, name in DEV_PHASES if ts < end)] += usd
+            calls += 1
+            tokens["out"] += u.get("output_tokens", 0)
+            tokens["cache_read"] += u.get("cache_read_input_tokens", 0)
+    return {"calls": calls, "phases": {k: round(v, 2) for k, v in phases.items()}, "usd": round(sum(phases.values()), 2),
+            "out_m": round(tokens["out"] / 1e6, 2), "cache_read_m": round(tokens["cache_read"] / 1e6, 1)}
 
 
 SBS = CELLS / "side_by_side"
@@ -555,6 +593,13 @@ Modal (cents).</p>
 <div class="legend" id="spendlegend"></div>
 <div class="tbl-wrap"><table id="spendtbl"><thead><tr><th>Item</th><th>Status</th><th class="r">US$</th></tr></thead><tbody></tbody></table></div>
 
+<h3 class="fig-h">Development with Claude Code (Opus 5.5)</h3>
+<p class="muted">The scripted expert costs nothing per demonstration, but writing it, the cells, the simulation API and
+the evaluation took many Claude Opus 5.5 sessions: more than all Dream-1 evaluation calls together, less than the fine-tunes. Shown at API list
+prices ($4 / $20 per million input / output tokens, $0.20 cache reads), from the local session logs; what was actually
+billed depends on the plan. Codex and Grok reviews are not included.</p>
+<div class="tbl-wrap"><table id="devtbl"><thead><tr><th>Phase</th><th class="r">US$ (list price)</th></tr></thead><tbody></tbody></table></div>
+
 <h2>Still running</h2>
 <p class="muted">Strictly one Dream session at a time. Last start 16:25, done by about 16:30. Times are estimates.</p>
 <ul class="queue">
@@ -707,6 +752,11 @@ row("Total committed","of "+usd(S.credit)+" $ credit",usd(done+run+ev),true);
     tr.append(el("td","mname",m.name),el("td","r num",m.times.length+"/40"),el("td","r num",m.t_median!=null?m.t_median.toFixed(1)+" s":"–"),
       el("td","r num",m.within20+"/40"),el("td","r num",m.within30+"/40"),el("td","r num",m.both!=null?m.both_faster+" of "+m.both:"–"));tb.append(tr)});
 })();
+// development cost
+(function(){const d=S.dev;if(!d)return;const tb=document.querySelector("#devtbl tbody");
+  Object.entries(d.phases).forEach(([k,v])=>{const tr=el("tr");tr.append(el("td",null,k),el("td","r num",usd(v)));tb.append(tr)});
+  const tr=el("tr");tr.append(el("td","mname",`Total, ${d.calls.toLocaleString("en-US")} model calls (${d.out_m} M output, ${d.cache_read_m} M cache-read tokens)`),el("td","r num mname",usd(d.usd)));tb.append(tr);
+  const t2=el("tr");t2.append(el("td","muted","For comparison: Dream-1 evaluation calls"),el("td","r num muted",usd(ev)));tb.append(t2)})();
 // theme
 const root=document.documentElement;
 try{const t=localStorage.getItem("cellres-theme");if(t)root.dataset.theme=t}catch(e){}
