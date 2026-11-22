@@ -57,7 +57,7 @@ export default function App() {
           <TabsTrigger value="cells">Zellen-Leitstand</TabsTrigger>
           <TabsTrigger value="devices">Geräte</TabsTrigger>
           <TabsTrigger value="skills">Skills</TabsTrigger>
-          <TabsTrigger value="results">Roboter &amp; Fine-Tune</TabsTrigger>
+          <TabsTrigger value="results">Robot &amp; Fine-tune</TabsTrigger>
         </TabsList>
         <TabsContent value="editor" className="mt-2 min-h-0 flex-1 border-t bg-white">
           <WorkflowEditor pollError={poll.error} />

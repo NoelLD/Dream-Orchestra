@@ -7,14 +7,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils'
 
 const OUTCOME: Record<OutcomeBucket, { label: string; className: string }> = {
-  success: { label: 'Erfolg', className: 'bg-blue-600' },
-  dropped: { label: 'fallen gelassen', className: 'bg-orange-500' },
-  not_released: { label: 'abgelegt, nicht losgelassen', className: 'bg-violet-600' },
-  no_grasp: { label: 'nicht gegriffen', className: 'bg-slate-300' },
-  action_error: { label: 'ungültiger Befehl (Greifer > 1)', className: 'bg-amber-500 bg-[repeating-linear-gradient(45deg,transparent_0_3px,rgba(255,255,255,.55)_3px_6px)]' },
+  success: { label: 'success', className: 'bg-blue-600' },
+  dropped: { label: 'dropped', className: 'bg-orange-500' },
+  not_released: { label: 'placed, not released', className: 'bg-violet-600' },
+  no_grasp: { label: 'not grasped', className: 'bg-slate-300' },
+  action_error: { label: 'invalid command (gripper > 1)', className: 'bg-amber-500 bg-[repeating-linear-gradient(45deg,transparent_0_3px,rgba(255,255,255,.55)_3px_6px)]' },
 }
-const JOB_STATUS: Record<string, string> = { succeeded: 'fertig', running: 'trainiert', queued: 'wartet', failed: 'fehlgeschlagen' }
-const usd = (v: number) => v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const JOB_STATUS: Record<string, string> = { succeeded: 'done', running: 'training', queued: 'queued', failed: 'failed' }
+const usd = (v: number) => v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const pct = (v: number) => `${Math.round(v * 100)} %`
 
 function RateBar({ model, base, n }: { model: ResultModel; base: ResultModel | undefined; n: number }) {
@@ -49,7 +49,7 @@ function SceneGrid({ data }: { data: CellResults }) {
                   <span
                     key={i}
                     className={cn('relative aspect-square rounded-sm', OUTCOME[bucket as OutcomeBucket]?.className ?? 'bg-slate-300')}
-                    title={`${data.task_names[t] ?? t}, Szene ${i}: ${OUTCOME[bucket as OutcomeBucket]?.label ?? raw}${contact ? ', Kontakt' : ''}`}
+                    title={`${data.task_names[t] ?? t}, scene ${i}: ${OUTCOME[bucket as OutcomeBucket]?.label ?? raw}${contact ? ', contact' : ''}`}
                   >
                     {contact && <span className="absolute top-0.5 right-0.5 size-1 rounded-full bg-slate-900" />}
                   </span>
@@ -69,7 +69,7 @@ function SceneGrid({ data }: { data: CellResults }) {
           <span className="relative size-3 rounded-sm bg-slate-300">
             <span className="absolute top-0.5 right-0.5 size-1 rounded-full bg-slate-900" />
           </span>
-          Punkt = Arm hat die Zelle berührt
+          dot = arm touched the cell
         </span>
       </div>
     </div>
@@ -145,9 +145,9 @@ export function ResultsView() {
   const robot = robots.data?.find((r) => r.name === 'yam-sim') ?? robots.data?.[0]
 
   if (results.isError) {
-    return <p className="p-6 text-sm text-red-700">Ergebnisse nicht abrufbar: {results.error.message}</p>
+    return <p className="p-6 text-sm text-red-700">Results unavailable: {results.error.message}</p>
   }
-  if (!data) return <p className="p-6 text-sm text-slate-600">Ergebnisse werden geladen …</p>
+  if (!data) return <p className="p-6 text-sm text-slate-600">Loading results …</p>
 
   const n = data.models[0]?.scenes.length ?? 0
   const base = data.models.find((m) => m.label === data.base)
@@ -160,22 +160,22 @@ export function ResultsView() {
     <div className="mx-auto max-w-[1200px] space-y-10 p-6">
       <section className="space-y-2">
         <div className="flex flex-wrap items-baseline gap-3">
-          <h2 className="text-lg font-semibold">Roboter „yam-sim“: lohnt sich ein Fine-Tune für diese Zellen?</h2>
+          <h2 className="text-lg font-semibold">Robot “yam-sim”: is a fine-tune worth it for these cells?</h2>
           {data.public_url && (
             <a href={data.public_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-blue-700 underline underline-offset-2">
-              Bericht zum Teilen <ExternalLink className="size-3.5" aria-hidden />
+              Shareable report <ExternalLink className="size-3.5" aria-hidden />
             </a>
           )}
-          <span className="ml-auto text-xs text-slate-500">Stand {data.generated_at.replace('T', ' ').slice(0, 16)}</span>
+          <span className="ml-auto text-xs text-slate-500">Updated {data.generated_at.replace('T', ' ').slice(0, 16)}</span>
         </div>
         <p className="max-w-[75ch] text-sm text-slate-600">
-          Teil des Orchestrators: Workflows nutzen Skills eines Robotertyps. Reicht das Basismodell in einer neuen Zelle nicht,
-          lernt der Roboter die Zelle aus geprüften Vorführungen. Freigegeben wird nur, was hier gemessen besser ist.
+          Workflows use the skills of a robot type. If the base model is not good enough in a new cell, the robot learns the
+          cell from checked demonstrations. Only what measures better here gets approved.
         </p>
         <p className="max-w-[75ch] text-slate-700">
-          {n} gleiche Testszenen pro Modell, nie im Training gesehen. Die Basis löst <b>{base?.k ?? '–'} von {n}</b>, nach dem
-          Fine-Tune <b>{fts.map((m) => m.k).join(', ')} von {n}</b> ({fts.length} Trainings). Verglichen wird gepaart: dieselbe
-          Szene für Basis und Fine-Tune (McNemar).
+          The same {n} test scenes for every model, never seen in training. The base model solves <b>{base?.k ?? '–'} of {n}</b>,
+          the fine-tunes <b>{fts.map((m) => m.k).join(', ')} of {n}</b> ({fts.length} trainings). Compared scene by scene
+          (McNemar test).
         </p>
       </section>
 
@@ -183,18 +183,18 @@ export function ResultsView() {
       {policy.isError && <p className="text-sm text-red-700">Decision table unavailable: {policy.error.message}</p>}
 
       <section>
-        <h3 className="mb-2 font-semibold">Erfolg auf {n} Szenen</h3>
+        <h3 className="mb-2 font-semibold">Success on {n} scenes</h3>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Modell</TableHead>
-              <TableHead className="text-right">Erfolg</TableHead>
-              <TableHead>Quote, 95 %-Intervall</TableHead>
-              <TableHead className="text-right">gewonnen : verloren</TableHead>
+              <TableHead>Model</TableHead>
+              <TableHead className="text-right">Success</TableHead>
+              <TableHead>Rate, 95 % interval</TableHead>
+              <TableHead className="text-right">won : lost vs. base</TableHead>
               <TableHead className="text-right">McNemar p</TableHead>
-              <TableHead className="text-right">Median Zeit</TableHead>
-              <TableHead className="text-right">in 30 s gelöst</TableHead>
-              <TableHead className="text-right">Läufe mit Kontakt</TableHead>
+              <TableHead className="text-right">Median time</TableHead>
+              <TableHead className="text-right">Solved within 30 s</TableHead>
+              <TableHead className="text-right">Runs with contact</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -224,24 +224,24 @@ export function ResultsView() {
           </TableBody>
         </Table>
         <p className="mt-2 max-w-[80ch] text-xs text-slate-600">
-          Varianten gelten nur als besser oder schlechter, wenn der Abstand größer ist als der zwischen zwei identischen
-          Trainings. Zeit = Sim-Sekunden bis zum Ablegen, Median nur über gelöste Szenen; „in 30 s gelöst“ zählt Tempo und
-          Erfolg zusammen auf allen Szenen. Läufe mit Kontakt steigen mit dem Fine-Tune: keine Aussage zur Sicherheit. Alles Simulation.
+          A variant only counts as better or worse if the gap is larger than between two identical trainings. Time = sim seconds
+          until the part is placed, median over solved scenes only. “Solved within 30 s” combines speed and success over all
+          scenes. Runs with contact go up with the fine-tune, so we make no safety claim. Everything is simulation.
         </p>
       </section>
 
       <section>
-        <h3 className="mb-1 font-semibold">Jede Szene im Vergleich</h3>
-        <p className="mb-3 text-sm text-slate-600">Ein Feld pro Szene, in jeder Zeile an derselben Stelle. Maus darüber zeigt das Ergebnis.</p>
+        <h3 className="mb-1 font-semibold">Every scene compared</h3>
+        <p className="mb-3 text-sm text-slate-600">One square per scene, same position in every row. Hover to see the outcome.</p>
         <SceneGrid data={data} />
       </section>
 
       <section className="grid grid-cols-2 gap-8">
         <div>
-          <h3 className="mb-2 font-semibold">Fine-Tune-Jobs {robot && <span className="font-normal text-slate-600">({robot.name})</span>}</h3>
+          <h3 className="mb-2 font-semibold">Fine-tune jobs {robot && <span className="font-normal text-slate-600">({robot.name})</span>}</h3>
           {robot?.fine_tuned_model && (
             <p className="mb-2 text-sm">
-              Aktiver Checkpoint: <code className="rounded bg-slate-100 px-1 text-xs">{robot.fine_tuned_model}</code>
+              Active checkpoint: <code className="rounded bg-slate-100 px-1 text-xs">{robot.fine_tuned_model}</code>
             </p>
           )}
           <Table>
@@ -249,7 +249,7 @@ export function ResultsView() {
               <TableRow>
                 <TableHead>Job</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Schritte</TableHead>
+                <TableHead className="text-right">Steps</TableHead>
                 <TableHead className="text-right">US$</TableHead>
               </TableRow>
             </TableHeader>
@@ -266,29 +266,29 @@ export function ResultsView() {
               ))}
             </TableBody>
           </Table>
-          {robots.isError && <p className="mt-2 text-sm text-red-700">Roboter nicht abrufbar: {robots.error.message}</p>}
+          {robots.isError && <p className="mt-2 text-sm text-red-700">Robots unavailable: {robots.error.message}</p>}
         </div>
         <div className="space-y-6">
           <div>
-            <h3 className="mb-2 font-semibold">Ausgaben</h3>
+            <h3 className="mb-2 font-semibold">Spending</h3>
             <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
-              <dt className="text-slate-600">Fine-Tunes (fertig und laufend)</dt>
+              <dt className="text-slate-600">Fine-tunes (done and running)</dt>
               <dd className="text-right tabular-nums">{usd(spentJobs)} $</dd>
-              <dt className="text-slate-600">Messläufe (Dream-Aufrufe)</dt>
+              <dt className="text-slate-600">Evaluation runs (Dream calls)</dt>
               <dd className="text-right tabular-nums">{usd(spentEvals)} $</dd>
-              <dt className="font-semibold">Gebunden</dt>
+              <dt className="font-semibold">Committed</dt>
               <dd className="text-right font-semibold tabular-nums">
-                {usd(spentJobs + spentEvals)} von {usd(data.spend.credit)} $
+                {usd(spentJobs + spentEvals)} of {usd(data.spend.credit)} $
               </dd>
             </dl>
           </div>
           <div>
-            <h3 className="mb-2 font-semibold">Messplan heute</h3>
+            <h3 className="mb-2 font-semibold">Measurement plan today</h3>
             <ul className="space-y-1 text-sm">
               {data.queue.map((q) => (
                 <li key={q.label} className="flex gap-3">
                   <Badge variant={q.done ? 'secondary' : 'outline'} className="w-16 justify-center">
-                    {q.done ? 'fertig' : 'offen'}
+                    {q.done ? 'done' : 'open'}
                   </Badge>
                   <span className={cn('flex-1', q.done && 'text-slate-500')}>{q.name}</span>
                   {!q.done && <span className="tabular-nums text-slate-500">{q.eta}</span>}
