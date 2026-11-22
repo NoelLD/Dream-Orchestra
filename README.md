@@ -7,6 +7,7 @@
 **Draw the process as a workflow: robot skills, machine steps, sensors, error paths.**<br>
 **Run it in a simulated cell, and fine-tune Dream-1 only when the numbers say it pays off.**
 
+[![Live app](https://img.shields.io/badge/live%20app-dream--orchestra.vercel.app-111?style=for-the-badge&logo=vercel)](https://dream-orchestra.vercel.app)
 [![Results](https://img.shields.io/badge/results-live%20page-2a78d6?style=for-the-badge)](https://cell-finetune-results.martinkaiser-bln.workers.dev)
 
 ![Dream-1](https://img.shields.io/badge/Dream--1-skills%20·%20fine--tuning-1c5cab)
@@ -19,6 +20,11 @@ REMix × Dream Labs hackathon, Berlin, 21–22 Nov 2026 · [Results page](https:
 
 </div>
 
+> **Try it online (no install):** [dream-orchestra.vercel.app](https://dream-orchestra.vercel.app) (frontend on
+> Vercel, backend API on Railway in `mock` mode). Load an example in the workflow editor, press **Start run**, then
+> open **Robot & Fine-tune** for the measured results and the decision table. The hosted backend has no MuJoCo cell,
+> so runs are replayed by a stand-in and the banner says **SIMULATED API**; the live cell needs the local setup below.
+>
 > **Try it (local, about 5 minutes, no Dream credits):** `DREAM_API_MODE=sim docker compose up -d --build`, open
 > `http://localhost:8080`. In the workflow editor pick **Load example → CNC-Zyklus (Zelle)** and press
 > **Start run**; the live image of the cell appears next to the log. Then load **CNC-Zyklus: Fehlerfall**: the unload
