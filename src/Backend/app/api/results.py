@@ -27,6 +27,7 @@ REFERENCE = "expert"  # geskripteter Referenz-Controller, führt Zellen-Tasks im
 # Varianten des Hauptrezepts: warum sie nicht freigegeben werden (Gesamtzahlen werden ergänzt)
 VARIANT_RULES: dict[str, str] = {
     "ft-rep-main": "same recipe trained again, only to measure noise",
+    "ft-rep2-main": "same recipe trained a third time, only to measure noise",
     "ft-lr3-main": "not clearly better than c500",
     "ft-b05-main": "worse than c500",
     "ft-c1000-main": "no better than c500, twice the cost",
