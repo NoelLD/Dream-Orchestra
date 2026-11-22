@@ -16,7 +16,8 @@
 ![React](https://img.shields.io/badge/React-React%20Flow%20editor-61dafb?logo=react&logoColor=black)
 ![Tests](https://img.shields.io/badge/tests-93%20backend%20·%2086%20frontend-2ea44f)
 
-REMix × Dream Labs hackathon, Berlin, 21–22 Nov 2026 · [Results page](https://cell-finetune-results.martinkaiser-bln.workers.dev)
+REMix × Dream Labs hackathon, Berlin, 21–22 Nov 2026 · [Results page](https://cell-finetune-results.martinkaiser-bln.workers.dev) ·
+[Demo video (2:42)](https://cell-finetune-results.martinkaiser-bln.workers.dev/dream-orchestra-demo.mp4)
 
 </div>
 
