@@ -29,17 +29,17 @@ export function RunLog({ pollError }: { pollError: Error | null }) {
   }
 
   return (
-    <section aria-label="Ablaufprotokoll" className="flex h-full min-w-0 flex-col">
+    <section aria-label="Run log" className="flex h-full min-w-0 flex-col">
       <div className="flex items-center gap-3 border-b px-3 py-1.5">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Protokoll</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Log</h2>
         {run ? (
           <>
             <Badge variant="outline" data-testid="run-status">Status: {RUN_STATUS_LABELS[run.status]}</Badge>
-            <span className="text-xs text-slate-700" data-testid="run-credits">Credits verbraucht: {run.credits.used}</span>
-            <span className="text-xs text-slate-500">Lauf {run.id}</span>
+            <span className="text-xs text-slate-700" data-testid="run-credits">Credits used: {run.credits.used}</span>
+            <span className="text-xs text-slate-500">Run {run.id}</span>
           </>
         ) : (
-          <span className="text-xs text-slate-600">Noch kein Lauf gestartet.</span>
+          <span className="text-xs text-slate-600">No run started yet.</span>
         )}
       </div>
 
@@ -53,7 +53,7 @@ export function RunLog({ pollError }: { pollError: Error | null }) {
       {(pollError || run?.error) && (
         <Alert variant="destructive" className="m-2 py-2">
           <AlertCircle aria-hidden />
-          <AlertTitle>{pollError ? 'Status konnte nicht abgefragt werden' : 'Lauf fehlgeschlagen'}</AlertTitle>
+          <AlertTitle>{pollError ? 'Could not fetch status' : 'Run failed'}</AlertTitle>
           <AlertDescription>{pollError?.message ?? run?.error}</AlertDescription>
         </Alert>
       )}
@@ -62,11 +62,11 @@ export function RunLog({ pollError }: { pollError: Error | null }) {
         <Table>
           <TableHeader className="sticky top-0 bg-white">
             <TableRow>
-              <TableHead className="w-24">Zeit</TableHead>
+              <TableHead className="w-24">Time</TableHead>
               <TableHead className="w-40">Block</TableHead>
               <TableHead className="w-28">API-Status</TableHead>
-              <TableHead className="w-20">Dauer</TableHead>
-              <TableHead>Meldung</TableHead>
+              <TableHead className="w-20">Duration</TableHead>
+              <TableHead>Message</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -94,7 +94,7 @@ export function RunLog({ pollError }: { pollError: Error | null }) {
 /** P4: Ausführungsart sichtbar machen – geskripteter Referenz-Controller (Zelle) oder Lauf im Simulationsdienst. */
 function ExecutionBadge({ message }: { message: string }) {
   if (message.includes('geskriptet-')) {
-    return <span className="mr-1.5 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-800" title="Bewegung vom geskripteten Referenz-Controller der Zelle, nicht von Dream-1. Keine Credits.">Referenz-Controller</span>
+    return <span className="mr-1.5 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-800" title="Motion from the cell's scripted reference controller, not from Dream-1. No credits.">Scripted controller</span>
   }
   if (/\brun_[a-z0-9]/.test(message)) {
     return <span className="mr-1.5 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-900" title="Lauf im Simulationsdienst (Dream-1 im Modus real, sonst geskriptet).">Simulationslauf</span>

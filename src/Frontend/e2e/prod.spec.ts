@@ -13,11 +13,11 @@ test('Produktions-Build: echtes Backend über /api, Banner zeigt dessen Modus', 
 
   await page.goto('/')
   if (mode === 'real') {
-    await expect(page.getByTestId('api-mode')).toHaveText('API: echt')
+    await expect(page.getByTestId('api-mode')).toHaveText('API: live')
     await expect(page.getByTestId('mock-banner')).toHaveCount(0)
   } else {
-    await expect(page.getByTestId('api-mode')).toHaveText(`API: SIMULIERT (${mode})`)
-    await expect(page.getByTestId('mock-banner')).toContainText('SIMULIERTE API')
+    await expect(page.getByTestId('api-mode')).toHaveText(mode === 'sim' ? 'API: PRECOMPUTED (sim)' : `API: SIMULATED (${mode})`)
+    await expect(page.getByTestId('mock-banner')).toContainText(mode === 'sim' ? 'PRECOMPUTED' : 'SIMULATED API')
   }
   // Geräte kommen aus dem Backend
   await expect(page.getByRole('switch', { name: 'Lichtschranke' })).toBeVisible()
@@ -37,7 +37,7 @@ test('Produktions-Build: Pick-and-Place-Lauf über das Backend (Schleife, Erfolg
   await page.request.put('/api/devices/weitere-objekte/value', { data: { value: true } })
 
   await page.goto('/')
-  await page.getByRole('button', { name: 'Lauf starten' }).click()
+  await page.getByRole('button', { name: 'Start run' }).click()
   await expect(page.getByTestId('block-greifen')).toHaveAttribute('data-active', 'true')
   await expect(page.getByTestId('block-sensor')).toHaveAttribute('data-active', 'true', { timeout: 15_000 })
 
@@ -53,6 +53,6 @@ test('Produktions-Build: Pick-and-Place-Lauf über das Backend (Schleife, Erfolg
 
 test('Produktions-Build: „Prüfen“ fragt nach der lokalen Prüfung auch das Backend', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Prüfen' }).click()
+  await page.getByRole('button', { name: 'Check' }).click()
   await expect(page.getByText(/Prüfung bestanden \(Backend\) · ≈ 2 Credits/)).toBeVisible()
 })

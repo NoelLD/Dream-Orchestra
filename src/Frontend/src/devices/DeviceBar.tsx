@@ -39,7 +39,7 @@ function SensorControl({ device, onSet }: { device: Device; onSet: (value: Devic
           setTimeout(() => onSet(false), BUTTON_PULSE_MS)
         }}
       >
-        {device.value === true ? 'ausgelöst' : 'Auslösen'}
+        {device.value === true ? 'triggered' : 'Trigger'}
       </Button>
     )
   }
@@ -64,7 +64,7 @@ function Unavailable({ device }: { device: Device }) {
   return (
     <span
       className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-medium text-red-900"
-      title={device.unavailable_reason ?? 'Wert gilt gerade nicht'}
+      title={device.unavailable_reason ?? 'value not valid right now'}
       data-testid={`device-unavailable-${device.id}`}
     >
       nicht verfügbar
@@ -79,7 +79,7 @@ function ActuatorDisplay({ device }: { device: Device }) {
     return (
       <span className="flex items-center gap-1.5 text-xs font-medium">
         <Lightbulb aria-hidden className={cn('size-5', on ? (red ? 'fill-red-500 text-red-700' : 'fill-emerald-400 text-emerald-700') : 'text-slate-400')} />
-        {on ? 'an' : 'aus'}
+        {on ? 'on' : 'off'}
       </span>
     )
   }
@@ -87,12 +87,12 @@ function ActuatorDisplay({ device }: { device: Device }) {
     return (
       <span className="flex items-center gap-1.5 text-xs font-medium">
         <ConveyorIcon running={on} />
-        {on ? 'läuft' : 'steht'}
+        {on ? 'running' : 'stopped'}
       </span>
     )
   }
   if (device.type === 'machine') {
-    return <span className={cn('rounded px-1.5 py-0.5 text-xs font-medium', on ? 'bg-amber-200 text-amber-950' : 'text-slate-600')}>{on ? 'Zyklus läuft' : 'bereit'}</span>
+    return <span className={cn('rounded px-1.5 py-0.5 text-xs font-medium', on ? 'bg-amber-200 text-amber-950' : 'text-slate-600')}>{on ? 'cycle running' : 'ready'}</span>
   }
   return <span className="text-xs font-medium">{String(device.value)}</span>
 }
@@ -106,7 +106,7 @@ function DeviceName({ device, htmlFor }: { device: Device; htmlFor?: string }) {
       </Tag>
       <span
         className="shrink-0 rounded border border-slate-300 px-1 text-[10px] leading-4 text-slate-600"
-        title={device.simulated ? `${PROTOCOL_LABELS[device.protocol]} – Wert simuliert` : PROTOCOL_LABELS[device.protocol]}
+        title={device.simulated ? `${PROTOCOL_LABELS[device.protocol]}, virtual value` : PROTOCOL_LABELS[device.protocol]}
         data-testid={`device-protocol-${device.id}`}
       >
         {PROTOCOL_LABELS[device.protocol]}
@@ -127,7 +127,7 @@ export function DeviceBar() {
   const setDevice = useMutation({
     mutationFn: ({ id, value }: { id: string; value: DeviceValue }) => api.setDevice(id, value),
     onSuccess: (device) => queryClient.setQueryData<Device[]>(['devices'], (old) => old?.map((d) => (d.id === device.id ? device : d))),
-    onError: (e) => toast.error(`Gerät konnte nicht gesetzt werden: ${e.message}`),
+    onError: (e) => toast.error(`Could not set device: ${e.message}`),
   })
 
   const workflowIds = useWorkflowDeviceIds()
@@ -136,21 +136,21 @@ export function DeviceBar() {
   const actuators = list.filter((d) => d.kind === 'actuator')
 
   return (
-    <section aria-label="Geräteleiste" className="flex h-full flex-col overflow-y-auto">
+    <section aria-label="Device bar" className="flex h-full flex-col overflow-y-auto">
       <div className="flex items-center gap-2 border-b px-3 py-1.5">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Geräte</h2>
-        <span className="text-[11px] text-slate-500">nur Geräte dieses Workflows · Werte simuliert</span>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Devices</h2>
+        <span className="text-[11px] text-slate-500">only devices of this workflow</span>
         {devices.isFetching && <Loader2 className="size-3 animate-spin text-slate-400" aria-hidden />}
       </div>
       {devices.isError && <p role="alert" className="px-3 py-2 text-xs text-red-700">Geräte nicht erreichbar: {devices.error.message}</p>}
       {devices.isSuccess && list.length === 0 ? (
         <p className="px-3 py-3 text-xs text-slate-600">
-          Noch keine Geräte im Workflow – im Block (Warte auf Sensor, Bedingung, Aktor setzen) auswählen. Geräte verwalten Sie im Tab „Geräte“.
+          No devices in this workflow yet. Pick one in a block (Wait for sensor, Condition, Set actuator). Manage devices in the “Devices” tab.
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-x-4 px-3 py-2">
           <div className="min-w-0">
-            <h3 className="mb-1 text-[11px] font-semibold text-slate-700">Sensoren (bedienbar)</h3>
+            <h3 className="mb-1 text-[11px] font-semibold text-slate-700">Sensors (operable)</h3>
             <ul className="space-y-1.5">
               {sensors.map((d) => (
                 <li key={d.id} className="flex items-center justify-between gap-2" data-testid={`device-${d.id}`}>
@@ -158,8 +158,8 @@ export function DeviceBar() {
                   {d.available === false ? (
                     <Unavailable device={d} />
                   ) : d.read_only ? (
-                    <span className="text-xs font-medium" data-testid={`device-readonly-${d.id}`} title="meldet die Zelle">
-                      {d.value === true ? 'an' : d.value === false ? 'aus' : String(d.value)}
+                    <span className="text-xs font-medium" data-testid={`device-readonly-${d.id}`} title="reported by the cell">
+                      {d.value === true ? 'on' : d.value === false ? 'off' : String(d.value)}
                     </span>
                   ) : (
                     <SensorControl device={d} onSet={(value) => setDevice.mutate({ id: d.id, value })} />
@@ -169,7 +169,7 @@ export function DeviceBar() {
             </ul>
           </div>
           <div className="min-w-0">
-            <h3 className="mb-1 text-[11px] font-semibold text-slate-700">Aktoren (Anzeige)</h3>
+            <h3 className="mb-1 text-[11px] font-semibold text-slate-700">Actuators (display)</h3>
             <ul className="space-y-1.5">
               {actuators.map((d) => (
                 <li key={d.id} className="flex items-center justify-between gap-2" data-testid={`device-${d.id}`}>

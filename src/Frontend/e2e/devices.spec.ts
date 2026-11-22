@@ -18,13 +18,13 @@ test('Gerät mit MQTT anlegen, im Workflow nutzen und in der Geräteleiste sehen
   await page.goto('/')
 
   // Beispiel-Workflow: Leiste zeigt nur dessen Geräte
-  const bar = page.getByRole('region', { name: 'Geräteleiste' })
+  const bar = page.getByRole('region', { name: 'Device bar' })
   await expect(bar.getByTestId('device-lichtschranke')).toBeVisible()
   await expect(bar.getByTestId('device-taster')).toHaveCount(0)
-  await expect(bar.getByTestId('device-protocol-lichtschranke')).toHaveText('virtuell')
+  await expect(bar.getByTestId('device-protocol-lichtschranke')).toHaveText('virtual')
 
   // Gerät anlegen
-  await page.getByRole('tab', { name: 'Geräte' }).click()
+  await page.getByRole('tab', { name: 'Devices' }).click()
   await expect(page.getByTestId('device-row-lichtschranke')).toBeVisible()
   await page.getByRole('button', { name: 'Neues Gerät' }).click()
   const dialog = page.getByRole('dialog', { name: 'Neues Gerät' })
@@ -46,9 +46,9 @@ test('Gerät mit MQTT anlegen, im Workflow nutzen und in der Geräteleiste sehen
   await page.screenshot(shot('21-geraete-ansicht'))
 
   // Im Workflow verwenden
-  await page.getByRole('tab', { name: 'Workflow-Editor' }).click()
-  await page.getByRole('button', { name: 'Neu', exact: true }).click()
-  await expect(bar).toContainText('Noch keine Geräte im Workflow')
+  await page.getByRole('tab', { name: 'Workflow editor' }).click()
+  await page.getByRole('button', { name: 'New', exact: true }).click()
+  await expect(bar).toContainText('No devices in this workflow yet')
   await page.getByTestId('palette-waitSensor').click()
   await page.getByLabel('Sensor', { exact: true }).click()
   await page.getByRole('option', { name: new RegExp(name) }).click()
@@ -61,10 +61,10 @@ test('Gerät mit MQTT anlegen, im Workflow nutzen und in der Geräteleiste sehen
   await page.screenshot(shot('22-geraeteleiste-workflow'))
 
   // Gespeichert verwendet -> Löschen gesperrt
-  await page.getByLabel('Name des Workflows').fill(`Tor ${TOKEN}`)
-  await page.getByRole('button', { name: 'Speichern', exact: true }).click()
-  await expect(page.getByTestId('save-state')).toHaveText('gespeichert')
-  await page.getByRole('tab', { name: 'Geräte' }).click()
+  await page.getByLabel('Workflow name').fill(`Tor ${TOKEN}`)
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByTestId('save-state')).toHaveText('saved')
+  await page.getByRole('tab', { name: 'Devices' }).click()
   await page.getByRole('button', { name: `${name} löschen` }).click()
   await page.getByRole('dialog', { name: 'Gerät löschen?' }).getByRole('button', { name: 'Löschen' }).click()
   await expect(page.getByText(/Löschen nicht möglich/)).toBeVisible()

@@ -8,8 +8,8 @@ import { isRunActive, useStopRun } from '@/run/useRun'
 import { useRunStore } from '@/workflow/store'
 
 const BACKEND_MODE_TEXT: Record<string, string> = {
-  mock: 'Backend-Stellvertreter: kein Dream-1, keine Credits. Statusmeldungen sind nachgespielt.',
-  sim: 'Simulationsdienst mit geskriptetem Ablauf: kein Dream-1, keine Credits.',
+  mock: 'backend stand-in: no Dream-1, no credits. Status messages are replayed.',
+  sim: 'cell tasks run the scripted controller; model results are precomputed measurements of the trained checkpoints. No live Dream-1 calls, no credits.',
 }
 
 export function MockBanner() {
@@ -20,8 +20,8 @@ export function MockBanner() {
 
   const text =
     apiMode === 'mock'
-      ? 'Testmodus: kein Backend, kein Dream-1, keine Credits. Alle Statusmeldungen sind nachgespielt.'
-      : (BACKEND_MODE_TEXT[status.data?.api_mode ?? ''] ?? 'Backend meldet einen simulierten Modus.')
+      ? 'test mode: no backend, no Dream-1, no credits. All status messages are replayed.'
+      : (BACKEND_MODE_TEXT[status.data?.api_mode ?? ''] ?? 'backend reports a simulated mode.')
   return (
     <>
       {(apiMode === 'mock' || backendSimulated) && (
@@ -31,7 +31,7 @@ export function MockBanner() {
           className="flex items-center justify-center gap-2 bg-amber-400 px-3 py-1 text-sm font-bold tracking-wide text-black"
           style={{ backgroundImage: 'repeating-linear-gradient(135deg, transparent 0 14px, rgba(0,0,0,.08) 14px 28px)' }}
         >
-          ⚠ SIMULIERTE API – {text}
+          {status.data?.api_mode === 'sim' && apiMode !== 'mock' ? 'PRECOMPUTED' : '⚠ SIMULATED API'} – {text}
         </div>
       )}
       {problems.map((problem) => (
@@ -50,17 +50,17 @@ export function AppHeader() {
   const status = useBackendStatus()
   const backendMode = status.data?.api_mode
   const simulated = apiMode === 'mock' || status.data?.banner === 'SIMULIERTE API'
-  const modeLabel = apiMode === 'mock' ? 'SIMULIERT' : backendMode === 'real' ? 'echt' : `SIMULIERT (${backendMode ?? '…'})`
+  const modeLabel = apiMode === 'mock' ? 'SIMULATED' : backendMode === 'real' ? 'live' : backendMode === 'sim' ? 'PRECOMPUTED (sim)' : `SIMULATED (${backendMode ?? '…'})`
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b bg-slate-900 px-4 text-white">
       <Workflow className="size-5" aria-hidden />
       <h1 className="text-base font-semibold">DreamOrchestra</h1>
-      <span className="hidden text-xs text-slate-300 xl:inline">Dream-1-Skills als Maschinen-Workflows – mit Messung, ob sie wirklich funktionieren</span>
+      <span className="hidden text-xs text-slate-300 xl:inline">Dream-1 skills as machine workflows, measured to show whether they really work</span>
       <span
         data-testid="api-mode"
         className={simulated ? 'rounded bg-amber-400 px-2 py-0.5 text-xs font-bold text-black' : 'rounded bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white'}
-        title={status.isError ? `Status nicht abrufbar: ${status.error.message}` : undefined}
+        title={status.isError ? `Status unavailable: ${status.error.message}` : undefined}
       >
         API: {modeLabel}
       </span>
@@ -76,13 +76,13 @@ export function AppHeader() {
         disabled={stop.isPending}
         onClick={() => {
           if (!run || !active) {
-            toast.info('Kein laufender Ablauf zum Stoppen.')
+            toast.info('No running workflow to stop.')
             return
           }
           stop.mutate(run.id)
         }}
       >
-        <Octagon aria-hidden /> STOPP
+        <Octagon aria-hidden /> STOP
       </Button>
     </header>
   )

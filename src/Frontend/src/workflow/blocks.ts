@@ -18,7 +18,7 @@ export const BLOCKS: { [K in WorkflowNodeType]: BlockMeta<K> } = {
   start: {
     type: 'start',
     label: 'Start',
-    description: 'Beginn des Ablaufs',
+    description: 'start of the workflow',
     icon: Play,
     accent: 'border-emerald-600',
     iconBg: 'bg-emerald-100 text-emerald-800',
@@ -29,7 +29,7 @@ export const BLOCKS: { [K in WorkflowNodeType]: BlockMeta<K> } = {
   prompt: {
     type: 'prompt',
     label: 'Dream-1-Prompt',
-    description: 'Anweisung an den Roboter',
+    description: 'instruction to the robot',
     icon: Bot,
     accent: 'border-violet-600',
     iconBg: 'bg-violet-100 text-violet-800',
@@ -39,8 +39,8 @@ export const BLOCKS: { [K in WorkflowNodeType]: BlockMeta<K> } = {
   },
   waitSensor: {
     type: 'waitSensor',
-    label: 'Warte auf Sensor',
-    description: 'Wartet, bis ein Sensor einen Wert hat',
+    label: 'Wait for sensor',
+    description: 'waits until a sensor has a value',
     icon: Radar,
     accent: 'border-amber-600',
     iconBg: 'bg-amber-100 text-amber-900',
@@ -50,8 +50,8 @@ export const BLOCKS: { [K in WorkflowNodeType]: BlockMeta<K> } = {
   },
   setActuator: {
     type: 'setActuator',
-    label: 'Aktor setzen',
-    description: 'Schaltet Lampe, Förderband oder Maschine; Fehlerpfad, wenn das Gerät nicht quittiert',
+    label: 'Set actuator',
+    description: 'switches lamp, conveyor or machine; error path if the device does not acknowledge',
     icon: ToggleRight,
     accent: 'border-sky-600',
     iconBg: 'bg-sky-100 text-sky-900',
@@ -61,8 +61,8 @@ export const BLOCKS: { [K in WorkflowNodeType]: BlockMeta<K> } = {
   },
   wait: {
     type: 'wait',
-    label: 'Warte (Zeit)',
-    description: 'Feste Pause in Sekunden',
+    label: 'Wait (time)',
+    description: 'fixed pause in seconds',
     icon: Timer,
     accent: 'border-slate-600',
     iconBg: 'bg-slate-200 text-slate-800',
@@ -72,8 +72,8 @@ export const BLOCKS: { [K in WorkflowNodeType]: BlockMeta<K> } = {
   },
   condition: {
     type: 'condition',
-    label: 'Bedingung',
-    description: 'Wenn Sensor …, dann A, sonst B',
+    label: 'Condition',
+    description: 'if sensor …, then A, else B',
     icon: GitBranch,
     accent: 'border-orange-600',
     iconBg: 'bg-orange-100 text-orange-900',
@@ -83,8 +83,8 @@ export const BLOCKS: { [K in WorkflowNodeType]: BlockMeta<K> } = {
   },
   end: {
     type: 'end',
-    label: 'Ende',
-    description: 'Ablauf erfolgreich beenden',
+    label: 'End',
+    description: 'finish the workflow successfully',
     icon: Flag,
     accent: 'border-rose-600',
     iconBg: 'bg-rose-100 text-rose-900',

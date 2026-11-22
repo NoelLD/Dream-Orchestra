@@ -14,9 +14,9 @@ export function Palette() {
   }
 
   return (
-    <nav aria-label="Block-Palette" className="flex h-full flex-col gap-2 overflow-y-auto p-3">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Blöcke</h2>
-      <p className="text-[11px] text-slate-600">Auf die Fläche ziehen oder mit Enter einfügen.</p>
+    <nav aria-label="Block palette" className="flex h-full flex-col gap-2 overflow-y-auto p-3">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Blocks</h2>
+      <p className="text-[11px] text-slate-600">Drag onto the canvas or press Enter to insert.</p>
       {BLOCK_ORDER.map((type) => {
         const meta = BLOCKS[type]
         const Icon = meta.icon
@@ -27,7 +27,7 @@ export function Palette() {
             draggable
             data-testid={`palette-${type}`}
             title={meta.description}
-            aria-label={`Block ${meta.label} einfügen – ${meta.description}`}
+            aria-label={`Insert block ${meta.label}: ${meta.description}`}
             onDragStart={(event) => {
               event.dataTransfer.setData(DND_MIME, type)
               event.dataTransfer.effectAllowed = 'move'

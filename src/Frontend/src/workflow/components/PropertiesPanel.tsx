@@ -110,8 +110,8 @@ export function PropertiesPanel() {
   const actuators = devices.filter((d) => d.kind === 'actuator')
 
   return (
-    <aside aria-label="Eigenschaften" className="flex h-full flex-col gap-3 overflow-y-auto p-3">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Eigenschaften</h2>
+    <aside aria-label="Properties" className="flex h-full flex-col gap-3 overflow-y-auto p-3">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Properties</h2>
 
       {globalIssues.map((i) => (
         <p key={i.message} role="alert" className="rounded border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-800">
@@ -120,7 +120,7 @@ export function PropertiesPanel() {
       ))}
 
       {!node ? (
-        <p className="text-sm text-slate-600">Block auswählen, um ihn zu bearbeiten.</p>
+        <p className="text-sm text-slate-600">Select a block to edit it.</p>
       ) : (
         <div className="space-y-3" data-testid="properties">
           <div className="text-sm font-semibold text-slate-900">{BLOCKS[node.type].label}</div>

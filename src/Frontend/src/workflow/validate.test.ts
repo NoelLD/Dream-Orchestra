@@ -62,7 +62,7 @@ describe('Prüfung vor dem Start (F4)', () => {
         ],
       ),
     )
-    expect(messagesFor(result, 'c')).toContain('Ausgang „sonst“ ist nicht verbunden.')
+    expect(messagesFor(result, 'c')).toContain('Ausgang „else“ ist nicht verbunden.')
   })
 
   it('verlangt ein gewähltes Gerät bei Sensor- und Aktor-Blöcken', () => {

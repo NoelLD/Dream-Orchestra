@@ -43,7 +43,7 @@ export function Toolbar() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const queryClient = useQueryClient()
   const confirmDiscard = () =>
-    !selectIsDirty(useEditor.getState()) || window.confirm('Ungespeicherte Änderungen verwerfen?')
+    !selectIsDirty(useEditor.getState()) || window.confirm('Discard unsaved changes?')
   const run = useRunStore((s) => s.run)
   const pollIntervalMs = useRunStore((s) => s.pollIntervalMs)
   const setPollInterval = useRunStore((s) => s.setPollInterval)
@@ -76,10 +76,10 @@ export function Toolbar() {
     mutationFn: (doc: WorkflowDocument) => api.validateWorkflow(doc),
     onSuccess: (remote) => {
       setIssues(remote.issues)
-      if (remote.valid) toast.success(`Prüfung bestanden (Backend) · ≈ ${remote.creditsEstimate} Credits`)
-      else toast.error(`Backend: ${remote.issues.length} Problem(e) – am Block markiert`)
+      if (remote.valid) toast.success(`Check passed (backend) · ≈ ${remote.creditsEstimate} credits`)
+      else toast.error(`Backend: ${remote.issues.length} problem(s), marked on the block`)
     },
-    onError: (e) => toast.error(`Prüfung im Backend fehlgeschlagen: ${e.message}`),
+    onError: (e) => toast.error(`Backend check failed: ${e.message}`),
   })
 
   const save = useMutation({
@@ -90,41 +90,41 @@ export function Toolbar() {
     onSuccess: (wf) => {
       useEditor.getState().markSaved(wf.id)
       void queryClient.invalidateQueries({ queryKey: ['workflows'] })
-      toast.success(`Workflow „${wf.name}“ gespeichert`)
+      toast.success(`Workflow “${wf.name}” saved`)
     },
-    onError: (e) => toast.error(`Speichern fehlgeschlagen: ${e.message}`),
+    onError: (e) => toast.error(`Saving failed: ${e.message}`),
   })
 
   const saveCopy = useMutation({
     mutationFn: () => {
       const doc = useEditor.getState().toDocument()
-      return api.createWorkflow({ ...doc, name: `${doc.name} (Kopie)` })
+      return api.createWorkflow({ ...doc, name: `${doc.name} (copy)` })
     },
     onSuccess: (wf) => {
       setName(wf.name)
       useEditor.getState().markSaved(wf.id)
       void queryClient.invalidateQueries({ queryKey: ['workflows'] })
-      toast.success(`Als „${wf.name}“ gespeichert`)
+      toast.success(`Saved as “${wf.name}”`)
     },
-    onError: (e) => toast.error(`Speichern fehlgeschlagen: ${e.message}`),
+    onError: (e) => toast.error(`Saving failed: ${e.message}`),
   })
 
   const onImport = async (file: File | undefined) => {
     if (!file) return
     const result = parseWorkflowJson(await file.text())
     if (!result.ok) {
-      toast.error('Import fehlgeschlagen', { description: result.error, duration: 10_000 })
+      toast.error('Import failed', { description: result.error, duration: 10_000 })
       return
     }
     if (!confirmDiscard()) return
     load(result.workflow)
-    toast.success(`Workflow „${result.workflow.name}“ importiert – noch nicht gespeichert`)
+    toast.success(`Workflow “${result.workflow.name}” imported, not saved yet`)
   }
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-b bg-white px-3 py-2">
       <Label htmlFor="wf-name" className="sr-only">
-        Name des Workflows
+        Workflow name
       </Label>
       <Input id="wf-name" value={name} onChange={(e) => setName(e.target.value)} className="h-8 w-48" />
       <span
@@ -134,20 +134,20 @@ export function Toolbar() {
           workflowId === null || dirty ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-900',
         )}
       >
-        {workflowId === null ? 'neu · nicht gespeichert' : dirty ? '● ungespeichert' : 'gespeichert'}
+        {workflowId === null ? 'new · not saved' : dirty ? '● unsaved' : 'saved'}
       </span>
 
       <Button size="sm" variant="outline" disabled={active} onClick={() => confirmDiscard() && newWorkflow()}>
-        <FilePlus aria-hidden /> Neu
+        <FilePlus aria-hidden /> New
       </Button>
       <Button size="sm" variant="outline" onClick={() => setDialogOpen(true)}>
-        <FolderOpen aria-hidden /> Öffnen …
+        <FolderOpen aria-hidden /> Open …
       </Button>
       <Button size="sm" variant="outline" onClick={() => save.mutate()} disabled={save.isPending}>
-        <Save aria-hidden /> Speichern
+        <Save aria-hidden /> Save
       </Button>
       <Button size="sm" variant="outline" onClick={() => saveCopy.mutate()} disabled={saveCopy.isPending}>
-        <Copy aria-hidden /> Als Kopie
+        <Copy aria-hidden /> Save copy
       </Button>
       <WorkflowsDialog open={dialogOpen} onOpenChange={setDialogOpen} />
       <Separator orientation="vertical" className="mx-1 h-6" />
@@ -155,18 +155,18 @@ export function Toolbar() {
       <Button size="sm" variant="outline" disabled={remoteCheck.isPending} onClick={() => {
         const { doc, result } = check()
         if (!result.valid) {
-          toast.error(`${result.issues.length} Problem(e) gefunden – am Block markiert`)
+          toast.error(`${result.issues.length} problem(s) found, marked on the block`)
           return
         }
         remoteCheck.mutate(doc)
       }}>
-        <CheckCircle2 aria-hidden /> Prüfen
+        <CheckCircle2 aria-hidden /> Check
       </Button>
       <Button size="sm" variant="outline" onClick={() => download(fileName(name), serializeWorkflow(useEditor.getState().toDocument()))}>
-        <Download aria-hidden /> Exportieren
+        <Download aria-hidden /> Export
       </Button>
       <Button size="sm" variant="outline" onClick={() => fileInput.current?.click()}>
-        <FileUp aria-hidden /> Importieren
+        <FileUp aria-hidden /> Import
       </Button>
       <input
         ref={fileInput}
@@ -190,9 +190,9 @@ export function Toolbar() {
           }
         }}
       >
-        <SelectTrigger size="sm" className="h-8 w-auto gap-1.5 border-0 shadow-none" aria-label="Beispiel laden" data-testid="sample-select">
+        <SelectTrigger size="sm" className="h-8 w-auto gap-1.5 border-0 shadow-none" aria-label="Load example" data-testid="sample-select">
           <RotateCcw aria-hidden className="size-4" />
-          <SelectValue placeholder="Beispiel laden" />
+          <SelectValue placeholder="Load example" />
         </SelectTrigger>
         <SelectContent>
           {SAMPLES.map((s) => (
@@ -207,12 +207,12 @@ export function Toolbar() {
         <span
           data-testid="credit-estimate"
           className="rounded border border-slate-300 bg-slate-50 px-2 py-1 text-xs text-slate-800"
-          title="Erreichbare Prompt-Blöcke × (1 + Wiederholungen). Bei Schleifen pro Durchlauf erneut."
+          title="Reachable prompt blocks × (1 + retries). With loops, again per pass."
         >
-          ≈ {estimateText} Credits/Durchlauf{estimate.hasLoop ? ' · Schleife ×n' : ''}
+          ≈ {estimateText} credits/run{estimate.hasLoop ? ' · loop ×n' : ''}
         </span>
         <Label htmlFor="poll" className="text-xs text-slate-700">
-          Abfrage
+          Polling
         </Label>
         <Select value={String(pollIntervalMs)} onValueChange={(v) => setPollInterval(Number(v))}>
           <SelectTrigger id="poll" size="sm" className="w-24">
@@ -234,10 +234,10 @@ export function Toolbar() {
         {run && run.status === 'paused' && (
           <>
             <Button size="sm" variant="outline" onClick={() => resumeRun.mutate(run.id)} disabled={resumeRun.isPending}>
-              <Play aria-hidden /> Weiter
+              <Play aria-hidden /> Resume
             </Button>
             <Button size="sm" variant="outline" onClick={() => stepRun.mutate(run.id)} disabled={stepRun.isPending}>
-              <StepForward aria-hidden /> Einzelschritt
+              <StepForward aria-hidden /> Step
             </Button>
           </>
         )}
@@ -248,13 +248,13 @@ export function Toolbar() {
           onClick={() => {
             const { doc, result } = check()
             if (!result.valid) {
-              toast.error(`Start nicht möglich: ${result.issues.length} Problem(e) – am Block markiert`)
+              toast.error(`Cannot start: ${result.issues.length} problem(s), marked on the block`)
               return
             }
             startRun.mutate({ workflowId, workflow: doc })
           }}
         >
-          <Play aria-hidden /> Lauf starten
+          <Play aria-hidden /> Start run
         </Button>
       </div>
     </div>

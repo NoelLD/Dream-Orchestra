@@ -13,11 +13,11 @@ function summary(node: FlowNode): string {
     case 'end':
       return ''
     case 'prompt':
-      return node.data.prompt.trim() === '' ? '(kein Prompt)' : `„${node.data.prompt}“`
+      return node.data.prompt.trim() === '' ? '(no prompt)' : `„${node.data.prompt}“`
     case 'waitSensor':
-      return `${node.data.deviceId || '?'} ${OPERATOR_LABELS[node.data.operator]} ${String(node.data.value)}${node.data.timeoutS ? ` · max. ${node.data.timeoutS} s` : ''}`
+      return `${node.data.deviceId || '?'} ${OPERATOR_LABELS[node.data.operator]} ${String(node.data.value)}${node.data.timeoutS ? ` · max ${node.data.timeoutS} s` : ''}`
     case 'condition':
-      return `wenn ${node.data.deviceId || '?'} ${OPERATOR_LABELS[node.data.operator]} ${String(node.data.value)}`
+      return `if ${node.data.deviceId || '?'} ${OPERATOR_LABELS[node.data.operator]} ${String(node.data.value)}`
     case 'setActuator':
       return `${node.data.deviceId || '?'} → ${String(node.data.value)}`
     case 'wait':
@@ -41,7 +41,7 @@ export function BlockNode(props: NodeProps<FlowNode>) {
     <div
       data-testid={`block-${id}`}
       data-active={isActive || undefined}
-      aria-label={`${meta.label}: ${title}${isActive ? ' (aktiv)' : ''}${issues.length ? ` – ${issues.length} Fehler` : ''}`}
+      aria-label={`${meta.label}: ${title}${isActive ? ' (active)' : ''}${issues.length ? ` – ${issues.length} errors` : ''}`}
       className={cn(
         'relative rounded-lg border-2 border-l-8 bg-white px-3 py-2 text-slate-900 shadow-sm transition-shadow',
         type === 'start' || type === 'end' ? 'w-[130px]' : 'w-[190px]',
@@ -64,7 +64,7 @@ export function BlockNode(props: NodeProps<FlowNode>) {
         </div>
         {isActive && (
           <span className={cn('ml-auto rounded px-1.5 py-0.5 text-[10px] font-bold', isPaused ? 'bg-amber-400 text-black' : 'bg-blue-600 text-white')}>
-            {isPaused ? 'PAUSE' : 'AKTIV'}
+            {isPaused ? 'PAUSED' : 'ACTIVE'}
           </span>
         )}
       </div>
@@ -92,7 +92,7 @@ export function BlockNode(props: NodeProps<FlowNode>) {
               type="source"
               position={Position.Right}
               style={{ top }}
-              aria-label={`Ausgang ${HANDLE_LABELS[handle]}`}
+              aria-label={`Output ${HANDLE_LABELS[handle]}`}
               className={cn('!size-3 !border-2 !border-white', isError ? '!bg-red-600' : '!bg-emerald-600')}
             />
             {meta.outputs.length > 1 && (

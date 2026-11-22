@@ -16,9 +16,9 @@ test.afterEach(async ({ request }) => {
 })
 
 async function saveAs(page: Page, name: string) {
-  await page.getByLabel('Name des Workflows').fill(name)
-  await page.getByRole('button', { name: 'Speichern', exact: true }).click()
-  await expect(page.getByTestId('save-state')).toHaveText('gespeichert')
+  await page.getByLabel('Workflow name').fill(name)
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByTestId('save-state')).toHaveText('saved')
 }
 
 test('mehrere Workflows anlegen, öffnen, Änderungen erkennen und löschen', async ({ page }) => {
@@ -27,31 +27,31 @@ test('mehrere Workflows anlegen, öffnen, Änderungen erkennen und löschen', as
   const first = unique('Pick-and-Place')
   const second = unique('Nur Start-Ende')
 
-  await expect(page.getByTestId('save-state')).toHaveText('neu · nicht gespeichert')
+  await expect(page.getByTestId('save-state')).toHaveText('new · not saved')
   await saveAs(page, first)
 
-  await page.getByRole('button', { name: 'Neu', exact: true }).click()
-  await expect(page.getByLabel('Name des Workflows')).toHaveValue('Neuer Workflow')
+  await page.getByRole('button', { name: 'New', exact: true }).click()
+  await expect(page.getByLabel('Workflow name')).toHaveValue('Neuer Workflow')
   await expect(page.getByTestId('block-greifen')).toHaveCount(0)
   await saveAs(page, second)
 
   // Änderung erkennen
-  await page.getByLabel('Name des Workflows').fill(`${second} (geändert)`)
-  await expect(page.getByTestId('save-state')).toHaveText('● ungespeichert')
+  await page.getByLabel('Workflow name').fill(`${second} (geändert)`)
+  await expect(page.getByTestId('save-state')).toHaveText('● unsaved')
 
   // Ersten Workflow öffnen (Warnung wegen ungespeicherter Änderungen)
-  await page.getByRole('button', { name: 'Öffnen …' }).click()
+  await page.getByRole('button', { name: 'Open …' }).click()
   const dialog = page.getByRole('dialog', { name: 'Workflows' })
   await expect(dialog.getByRole('alert')).toContainText('ungespeicherte Änderungen')
   await expect(dialog.getByRole('button', { name: `${first} öffnen`, exact: true })).toBeVisible()
   await page.screenshot(shot('12-workflows-dialog'))
   await dialog.getByRole('button', { name: `${first} öffnen` }).click()
-  await expect(page.getByLabel('Name des Workflows')).toHaveValue(first)
+  await expect(page.getByLabel('Workflow name')).toHaveValue(first)
   await expect(page.getByTestId('block-greifen')).toBeVisible()
-  await expect(page.getByTestId('save-state')).toHaveText('gespeichert')
+  await expect(page.getByTestId('save-state')).toHaveText('saved')
 
   // Zweiten löschen (zweistufig)
-  await page.getByRole('button', { name: 'Öffnen …' }).click()
+  await page.getByRole('button', { name: 'Open …' }).click()
   await dialog.getByRole('button', { name: `${second} löschen` }).click()
   await dialog.getByRole('button', { name: `${second} wirklich löschen`, exact: true }).click()
   await expect(dialog.getByRole('button', { name: `${second} öffnen`, exact: true })).toHaveCount(0)
@@ -62,10 +62,10 @@ test('„Als Kopie“ legt einen zweiten Workflow an', async ({ page }) => {
   await page.goto('/')
   const name = unique('Original')
   await saveAs(page, name)
-  await page.getByRole('button', { name: 'Als Kopie' }).click()
-  await expect(page.getByLabel('Name des Workflows')).toHaveValue(`${name} (Kopie)`)
-  await expect(page.getByTestId('save-state')).toHaveText('gespeichert')
-  await page.getByRole('button', { name: 'Öffnen …' }).click()
+  await page.getByRole('button', { name: 'Save copy' }).click()
+  await expect(page.getByLabel('Workflow name')).toHaveValue(`${name} (Kopie)`)
+  await expect(page.getByTestId('save-state')).toHaveText('saved')
+  await page.getByRole('button', { name: 'Open …' }).click()
   const dialog = page.getByRole('dialog', { name: 'Workflows' })
   await expect(dialog.getByRole('button', { name: `${name} (Kopie) öffnen`, exact: true })).toBeVisible()
   await expect(dialog.getByRole('button', { name: `${name} öffnen`, exact: true })).toBeVisible()

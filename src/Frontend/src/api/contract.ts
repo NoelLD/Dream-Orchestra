@@ -219,7 +219,7 @@ export const DEVICE_TYPE_LABELS: Record<DeviceType, string> = {
 
 export const DeviceProtocolSchema = z.enum(['virtual', 'mqtt', 'opcua'])
 export type DeviceProtocol = z.infer<typeof DeviceProtocolSchema>
-export const PROTOCOL_LABELS: Record<DeviceProtocol, string> = { virtual: 'virtuell', mqtt: 'MQTT', opcua: 'OPC UA' }
+export const PROTOCOL_LABELS: Record<DeviceProtocol, string> = { virtual: 'virtual', mqtt: 'MQTT', opcua: 'OPC UA' }
 
 const optionalText = z.string().nullable().optional()
 /** Passwort nur schreiben; Antworten enthalten stattdessen `password_set`. Leer beim Bearbeiten = unverändert. */

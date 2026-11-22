@@ -6,7 +6,7 @@ const shot = (name: string) => ({ path: `e2e/screenshots/${name}.png` })
 test('Pick-and-Place-Lauf: Sensor, Schleife zurück und erfolgreiches Ende (F2/F5/F10)', async ({ page }) => {
   test.setTimeout(45_000)
   await page.goto('/')
-  await page.getByRole('button', { name: 'Lauf starten' }).click()
+  await page.getByRole('button', { name: 'Start run' }).click()
   await expect(page.getByTestId('block-greifen')).toHaveAttribute('data-active', 'true')
 
   // Nach dem Prompt (3 s im Testmodus) wartet der Ablauf auf die Lichtschranke.
@@ -26,9 +26,9 @@ test('Pick-and-Place-Lauf: Sensor, Schleife zurück und erfolgreiches Ende (F2/F
 test('Pause, Einzelschritt und Credit-Schätzung (F8/F15)', async ({ page }) => {
   test.setTimeout(30_000)
   await page.goto('/')
-  await expect(page.getByTestId('credit-estimate')).toContainText('1–2 Credits/Durchlauf · Schleife')
+  await expect(page.getByTestId('credit-estimate')).toContainText('1–2 credits/run · loop')
   // Bedienelemente dürfen nicht verdeckt sein: Klicks ohne force.
-  await page.getByRole('button', { name: 'Lauf starten' }).click()
+  await page.getByRole('button', { name: 'Start run' }).click()
   await page.getByRole('button', { name: 'Pause', exact: true }).click()
   await expect(page.getByTestId('run-status')).toContainText('pausiert')
   await page.screenshot(shot('08-pausiert'))
@@ -38,7 +38,7 @@ test('Pause, Einzelschritt und Credit-Schätzung (F8/F15)', async ({ page }) => 
   await expect(page.getByTestId('block-sensor')).toHaveAttribute('data-active', 'true', { timeout: 10_000 })
   await expect(page.getByTestId('run-status')).toContainText('pausiert')
   await page.getByRole('button', { name: 'Weiter' }).click()
-  await expect(page.getByTestId('run-status')).toContainText('läuft')
+  await expect(page.getByTestId('run-status')).toContainText('running')
   await page.getByTestId('stop-button').click()
   await expect(page.getByTestId('run-status')).toContainText('gestoppt')
 })
@@ -46,7 +46,7 @@ test('Pause, Einzelschritt und Credit-Schätzung (F8/F15)', async ({ page }) => 
 test('Export und Import über die Oberfläche (F3)', async ({ page }, testInfo) => {
   await page.goto('/')
   const downloadPromise = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Exportieren' }).click()
+  await page.getByRole('button', { name: 'Export' }).click()
   const download = await downloadPromise
   const exportedPath = testInfo.outputPath('export.json')
   await download.saveAs(exportedPath)
@@ -59,7 +59,7 @@ test('Export und Import über die Oberfläche (F3)', async ({ page }, testInfo) 
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ ...exported, name: 'Importierter Ablauf' })),
   })
-  await expect(page.getByLabel('Name des Workflows')).toHaveValue('Importierter Ablauf')
+  await expect(page.getByLabel('Workflow name')).toHaveValue('Importierter Ablauf')
 
   await page.getByTestId('import-input').setInputFiles({ name: 'kaputt.json', mimeType: 'application/json', buffer: Buffer.from('{ nein') })
   await expect(page.getByText('Import fehlgeschlagen')).toBeVisible()

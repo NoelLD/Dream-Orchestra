@@ -8,7 +8,7 @@ test.describe('DreamOrchestra Smoke-Test (Testmodus)', () => {
   })
 
   test('zeigt das Banner „SIMULIERTE API“ und den Beispiel-Workflow', async ({ page }) => {
-    await expect(page.getByTestId('mock-banner')).toContainText('SIMULIERTE API')
+    await expect(page.getByTestId('mock-banner')).toContainText('SIMULATED API')
     await expect(page.getByTestId('stop-button')).toBeVisible()
     for (const id of ['start', 'greifen', 'sensor', 'weiter', 'ende']) {
       await expect(page.getByTestId(`block-${id}`)).toBeVisible()
@@ -19,10 +19,10 @@ test.describe('DreamOrchestra Smoke-Test (Testmodus)', () => {
   })
 
   test('startet einen Lauf, hebt den aktiven Block hervor und stoppt ihn', async ({ page }) => {
-    await page.getByRole('button', { name: 'Lauf starten' }).click()
+    await page.getByRole('button', { name: 'Start run' }).click()
     const active = page.getByTestId('block-greifen')
     await expect(active).toHaveAttribute('data-active', 'true')
-    await expect(page.getByTestId('run-status')).toContainText('läuft')
+    await expect(page.getByTestId('run-status')).toContainText('running')
     await page.screenshot(shot('02-lauf-aktiv'))
 
     await page.getByTestId('stop-button').click()
@@ -33,7 +33,7 @@ test.describe('DreamOrchestra Smoke-Test (Testmodus)', () => {
 
   test('markiert Fehler am Block, wenn die Prüfung vor dem Start scheitert', async ({ page }) => {
     await page.getByTestId('palette-prompt').click()
-    await page.getByRole('button', { name: 'Lauf starten' }).click()
+    await page.getByRole('button', { name: 'Start run' }).click()
     await expect(page.getByText('Der Prompt ist leer.')).toBeVisible()
     await expect(page.getByText('Block ist nicht mit dem Start verbunden.')).toBeVisible()
     await expect(page.getByTestId('run-status')).toHaveCount(0)

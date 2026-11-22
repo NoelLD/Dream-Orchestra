@@ -4,10 +4,10 @@ export type ValidationIssue = { nodeId: string | null; message: string }
 export type ValidationResult = { valid: boolean; issues: ValidationIssue[] }
 
 export const HANDLE_LABELS: Record<SourceHandle, string> = {
-  out: 'weiter',
-  error: 'Fehler',
-  true: 'wahr',
-  false: 'sonst',
+  out: 'next',
+  error: 'error',
+  true: 'true',
+  false: 'else',
 }
 
 /** Ausgänge, die verbunden sein müssen. "error" ist optional (ohne ihn bricht der Lauf ab). */

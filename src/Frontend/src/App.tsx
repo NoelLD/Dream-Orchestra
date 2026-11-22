@@ -53,9 +53,9 @@ export default function App() {
       <MockBanner />
       <Tabs defaultValue="editor" className="flex min-h-0 flex-1 flex-col gap-0">
         <TabsList className="mx-3 mt-2">
-          <TabsTrigger value="editor">Workflow-Editor</TabsTrigger>
-          <TabsTrigger value="cells">Zellen-Leitstand</TabsTrigger>
-          <TabsTrigger value="devices">Geräte</TabsTrigger>
+          <TabsTrigger value="editor">Workflow editor</TabsTrigger>
+          <TabsTrigger value="cells">Cell control</TabsTrigger>
+          <TabsTrigger value="devices">Devices</TabsTrigger>
           <TabsTrigger value="skills">Skills</TabsTrigger>
           <TabsTrigger value="results">Robot &amp; Fine-tune</TabsTrigger>
         </TabsList>

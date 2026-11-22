@@ -41,7 +41,7 @@ export function SmartEdge(props: EdgeProps) {
       path={path}
       markerEnd={markerEnd}
       style={{ ...style, strokeDasharray: '6 4' }}
-      label="Schleife"
+      label="loop"
       labelX={(left + right) / 2}
       labelY={top}
       labelStyle={{ fontSize: 11, fontWeight: 600, fill: '#334155' }}
