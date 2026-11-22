@@ -38,6 +38,21 @@ REMix × Dream Labs hackathon, Berlin, 21–22 Nov 2026 · [Results page](https:
 > by the scripted reference controller, not by Dream-1, and the banner says so: model results in the app are
 > precomputed measurements of the trained checkpoints.
 
+## Findings in one minute
+
+| # | Finding | Evidence (simulation, same test scenes, paired) |
+|---|---|---|
+| 1 | **Fine-tuning on cell demos works, and it repeats.** | Base 6/40 → same recipe trained three times: 14, 17, 16 of 40 (p = 0.057, 0.013, 0.021) |
+| 2 | **More training is not better.** | 1000 steps: 13/40, no better than 500 steps at twice the cost; mixing in 50 % base data: 6/40 |
+| 3 | **The fine-tune forgets other skills.** | Picking a banana outside the cells: 6/20 → 0/20 (6 : 0, p = 0.031), pre-registered "harms" rule met |
+| 4 | **It does not transfer to a new task.** | Untrained `cnc_return`: expert 20/20, base 1/20, fine-tune 0/20 → "transfer not shown" |
+| 5 | **The scripted controller still wins in the cell.** | Expert 39/40; the best fine-tune solves less than half |
+
+**Conclusion:** a fine-tuned checkpoint is a tool for a specific robot and cell, not an upgrade. It belongs in the
+tasks where it was measured better, and nowhere else. Dream Orchestra makes that decision visible per task, from
+measurements, before a checkpoint runs in a workflow. Limits: simulation only, 10 scenes per task, contacts rise
+with fine-tuning, so no safety claim.
+
 ![How it works: build the workflow in the editor, the engine runs it against a MuJoCo cell; a scripted expert records demos, Dream-1 is fine-tuned, every checkpoint is measured on 40 identical scenes, and a decision table says which checkpoint may run which task](docs/img/how-it-works.svg)
 
 ![Workflow editor with the CNC cycle: load blank, start machine, wait for "machine done", unload, green light, error paths to a red stack light; below, the run log, the live image of the CNC cell and the cell's devices](docs/img/editor-live-cell.png)
