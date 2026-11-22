@@ -9,6 +9,7 @@ import { ResultsView } from '@/results/ResultsView'
 import { useRunPolling } from '@/run/useRun'
 import { SkillsView } from '@/skills/SkillsView'
 import { Canvas } from '@/workflow/components/Canvas'
+import { CellLive } from '@/workflow/components/CellLive'
 import { Palette } from '@/workflow/components/Palette'
 import { PropertiesPanel } from '@/workflow/components/PropertiesPanel'
 import { Toolbar } from '@/workflow/components/Toolbar'
@@ -29,10 +30,11 @@ function WorkflowEditor({ pollError }: { pollError: Error | null }) {
             <PropertiesPanel />
           </div>
         </div>
-        <div className="grid min-h-0 grid-cols-[1fr_400px] border-t bg-white">
+        <div className="grid min-h-0 grid-cols-[1fr_auto_400px] border-t bg-white">
           <div className="min-h-0 min-w-0">
             <RunLog pollError={pollError} />
           </div>
+          <CellLive />
           <div className="min-h-0 border-l">
             <DeviceBar />
           </div>

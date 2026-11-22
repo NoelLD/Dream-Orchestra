@@ -43,6 +43,13 @@ export function RunLog({ pollError }: { pollError: Error | null }) {
         )}
       </div>
 
+      {run && run.log.length > 0 && (
+        <p className="border-b bg-slate-50 px-3 py-1.5 text-sm font-medium" data-testid="run-last-message">
+          <ExecutionBadge message={run.log[run.log.length - 1]!.message} />
+          {run.log[run.log.length - 1]!.message}
+        </p>
+      )}
+
       {(pollError || run?.error) && (
         <Alert variant="destructive" className="m-2 py-2">
           <AlertCircle aria-hidden />

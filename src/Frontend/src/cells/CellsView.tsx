@@ -62,7 +62,7 @@ function sensorText(value: unknown): string {
   return String(value)
 }
 
-function LiveImage({ session, view }: { session: CellSession | null; view: CellView }) {
+export function LiveImage({ session, view }: { session: CellSession | null; view: CellView }) {
   const [tick, setTick] = useState(0)
   useEffect(() => {
     if (!session) return
