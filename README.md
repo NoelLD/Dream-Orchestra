@@ -7,8 +7,13 @@
 **Draw the process as a workflow: robot skills, machine steps, sensors, error paths.**<br>
 **Run it in a simulated cell, and fine-tune Dream-1 only when the numbers say it pays off.**
 
+**Measured:** a cell fine-tune lifts success from **6/40 to 14–17/40** (same recipe, three trainings), but forgets
+a skill outside the cells (**6/20 → 0/20**) and does not transfer to a new task (**0/20**).<br>
+So the app decides per task which checkpoint may run.
+
 [![Live app](https://img.shields.io/badge/live%20app-dream--orchestra.vercel.app-111?style=for-the-badge&logo=vercel)](https://dream-orchestra.vercel.app)
 [![Results](https://img.shields.io/badge/results-live%20page-2a78d6?style=for-the-badge)](https://cell-finetune-results.martinkaiser-bln.workers.dev)
+[![Demo video](https://img.shields.io/badge/demo%20video-2%3A42-e8590c?style=for-the-badge&logo=youtube&logoColor=white)](https://cell-finetune-results.martinkaiser-bln.workers.dev/dream-orchestra-demo.mp4)
 
 ![Dream-1](https://img.shields.io/badge/Dream--1-skills%20·%20fine--tuning-1c5cab)
 ![MuJoCo](https://img.shields.io/badge/MuJoCo-two%20simulated%20cells-555)
@@ -120,6 +125,17 @@ local measurements exist.
 ![Cell control room: live view of the CNC cell with tasks, controls and sensor states](docs/img/cell-control-room.jpg)
 
 ---
+
+## What's next
+
+Dream-1 checkpoints executing cell tasks inside a workflow (today: scripted controller) · real MQTT / OPC UA
+devices · a part feeder in the simulated cell · more test scenes per task so per-task decisions become possible
+
+---
+
+Built in two days at the REMix × Dream Labs hackathon, Berlin. Tools: Dream-1 (fine-tuning API), MuJoCo,
+FastAPI, React Flow, Claude Code. Video narration: ElevenLabs and Qwen3-TTS (AI voices); footage is real app and
+MuJoCo recordings. Never commit API keys: they live in `.env`, which stays out of git.
 
 ## Details (Deutsch)
 
