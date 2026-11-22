@@ -32,7 +32,8 @@ class CellSession:
         self.state: dict = {"cell": cell, "status": "starting"}
         self.frames: dict[str, bytes] = {}
         self.events: list[dict] = []
-        self.busy: str | None = None
+        self.busy: str | None = None  # set by the API when a task is queued, cleared when it ends
+        self.request_ids: set[str] = set()  # idempotency keys of accepted task requests
         self.auto = False  # conveyor: sort automatically whenever a part waits at its station
         self.thread = threading.Thread(target=self._loop, name=f"cell-{cell}", daemon=True)
         self.thread.start()
@@ -168,6 +169,7 @@ class CellSession:
         if kind == "task":
             task = args["task"]
             if TASKS[task]["cell"] != self.cell:
+                self.busy = None
                 self._event(f"Task {task} gehört nicht zu dieser Zelle", gate=False)
                 return
             self.busy = task

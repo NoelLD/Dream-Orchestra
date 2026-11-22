@@ -39,6 +39,9 @@ class FakeCells:
         self.block_cycle = False
         self.cycle_left = 0
         self.deletes = 0
+        self.queue_polls = 0  # > 0: ein Task steht so viele Abfragen in der Warteschlange, bevor er „busy“ zeigt
+        self.queued: str | None = None
+        self.task_posts: list[dict] = []
 
     def _event(self, text: str, **data: object) -> None:
         assert self.session is not None
@@ -69,6 +72,11 @@ class FakeCells:
                 if self.session is None:
                     return httpx.Response(409, json={"error": "no_session", "detail": "no cell session"})
                 self.session["sim_seconds"] = self.session.get("sim_seconds", 0.0) + 0.5
+                if self.queued is not None:
+                    self.queue_polls -= 1
+                    if self.queue_polls <= 0:
+                        self.session["busy"], self.left, self.queued = self.queued, self.polls_per_task, None
+                    return httpx.Response(200, json=self.session)  # Warteschlange: noch kein Zeichen in der Sitzung
                 if self.cycle_left > 0:
                     self.cycle_left -= 1
                     if self.cycle_left == 0:
@@ -91,6 +99,10 @@ class FakeCells:
                 return httpx.Response(200, json=self.session)
             case "POST", "/cells/session/task":
                 assert self.session is not None
+                self.task_posts.append(body)
+                if self.queue_polls > 0:  # wie die Simulation vor dem Neustart: erst einreihen, später „busy“
+                    self.queued = body["task"]
+                    return httpx.Response(202, json={"queued": "task"})
                 if self.session["busy"]:
                     return httpx.Response(409, json={"error": "busy", "detail": "busy"})
                 if body["task"] == "cnc_unload" and not self.finished_part:
@@ -578,3 +590,26 @@ async def test_lost_task_response_does_not_run_the_task_twice() -> None:
     run = await finish(dream, await dream.start(skill="cnc_load", prompt="", checkpoint=None))
     assert run.success
     assert posts["n"] == 1  # genau einmal abgeschickt
+
+
+@pytest.mark.asyncio
+async def test_lost_response_while_task_is_queued_is_not_resent() -> None:
+    """Codex Review 5: der Dienst reiht ein, zeigt den Task aber erst später als „busy“; die Antwort geht verloren."""
+    fake = FakeCells(polls_per_task=1)
+    fake.queue_polls = 3
+    lost = {"done": False}
+
+    def lossy(request: httpx.Request) -> httpx.Response:
+        response = fake(request)
+        if request.url.path == "/cells/session/task" and not lost["done"]:
+            lost["done"] = True
+            raise httpx.ReadError("lost", request=request)
+        return response
+
+    dream = CellDreamClient(
+        NoDream(), SimulationApi("http://sim", transport=httpx.MockTransport(lossy)), allow_scripted=True, poll_s=0.01
+    )
+    await dream.api.request("POST", "/cells/cnc/session")
+    run = await finish(dream, await dream.start(skill="cnc_load", prompt="", checkpoint=None))
+    assert run.success and len(fake.task_posts) == 1
+    assert fake.task_posts[0]["request_id"]  # Idempotenz-Schlüssel für die Simulation

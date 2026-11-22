@@ -15,6 +15,7 @@ Zellen-Aktion raus; der Aktor-Block wartet auf die Quittung und endet sonst im F
 import asyncio
 import itertools
 import time
+import uuid
 from typing import Any
 
 from app.devices.adapter import Device, DeviceAdapter, DeviceType
@@ -26,6 +27,7 @@ SESSION_START_S = 90.0  # Zelle bauen + erstes Bild; unter Last antwortet der Di
 BUSY_CODES = frozenset({"busy", "simulation_unavailable"})  # beim Start: weiter warten statt abbrechen
 REFERENCE = "referenz"  # Checkpoint-Wert: Zellen-Task ausdrücklich mit dem geskripteten Referenz-Controller
 CYCLE_ACK_S = 5.0  # so lange auf "Maschine läuft" oder eine Sperre warten
+ACCEPT_GRACE_S = 5.0  # nach verlorener Antwort: so lange kann ein Task noch in der Warteschlange des Dienstes stehen
 REFILL_TASKS = frozenset({"cnc_load"})  # brauchen ein frisches Rohteil; die Simulation hat keine Zuführung
 REFILL_NOTE = "neues Rohteil: Zellen-Sitzung neu gestartet (Simulation ohne Teilezuführung)"
 
@@ -183,22 +185,27 @@ class CellDreamClient:
             session, note = await self._ensure_session(cell), REFILL_NOTE
         marker = _marker(session)
         deadline = time.monotonic() + SESSION_START_S
-        maybe_sent = False  # eine Antwort ging verloren: der Dienst hat den Task vielleicht schon angenommen
+        # Doppelte Ausführung verhindern (Codex): derselbe Schlüssel bei jedem erneuten Senden (der Dienst führt eine
+        # Anfrage mit bekanntem Schlüssel nicht noch einmal aus), und nach einer verlorenen Antwort erst nachsehen.
+        # Ein angenommener Task steht kurz in der Warteschlange, bevor die Sitzung ihn zeigt: so lange gilt „unklar“.
+        body = {"task": task, "request_id": uuid.uuid4().hex}
+        lost_at: float | None = None  # Zeitpunkt der verlorenen Antwort
         while True:
-            if maybe_sent:
+            if lost_at is not None:
                 accepted = await self._accepted(task, marker)
                 if accepted:
-                    break  # nicht ein zweites Mal schicken (Codex: doppelte Ausführung)
-                if accepted is None:  # unklar (Dienst antwortet nicht): warten statt erneut schicken
+                    break
+                if accepted is None or time.monotonic() < lost_at + ACCEPT_GRACE_S:  # warten statt erneut schicken
                     if time.monotonic() > deadline:
                         raise DreamError(f"Zellen-Task {task}: Annahme nicht bestätigt, Dienst antwortet nicht")
                     await asyncio.sleep(self.poll_s)
                     continue
             try:
-                await self.api.request("POST", "/cells/session/task", {"task": task})
+                await self.api.request("POST", "/cells/session/task", body)
                 break
             except UpstreamError as exc:
-                maybe_sent = maybe_sent or exc.code == "simulation_unavailable"
+                if exc.code == "simulation_unavailable":
+                    lost_at = time.monotonic()
                 if exc.code in BUSY_CODES and time.monotonic() < deadline:
                     await asyncio.sleep(self.poll_s)
                     continue

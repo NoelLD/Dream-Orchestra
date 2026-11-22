@@ -3,8 +3,11 @@ import { useEffect } from 'react'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
 import { TERMINAL_RUN_STATUSES, type Run, type StartRunRequest } from '@/api/contract'
-import { validationFromError } from '@/api/realClient'
+import { ApiError, validationFromError } from '@/api/realClient'
 import { useEditor, useRunStore } from '@/workflow/store'
+
+/** Eine gemerkte Lauf-ID nur verwerfen, wenn das Backend den Lauf sicher nicht kennt (404) – nicht bei 503 oder Netzfehlern. */
+export const shouldForgetRun = (error: unknown) => error instanceof ApiError && error.status === 404
 
 export const isRunActive = (run: Run | null) => run !== null && !TERMINAL_RUN_STATUSES.includes(run.status)
 
@@ -29,10 +32,10 @@ export function useRunPolling() {
     if (query.data) setRun(query.data)
   }, [query.data, setRun])
 
-  // Gemerkte ID aus einer früheren Sitzung, die das Backend nicht mehr kennt: verwerfen statt hängen zu bleiben
+  // Gemerkte ID, die das Backend nicht mehr kennt (404): verwerfen. Bei 503/Netzfehler behalten, Abfrage läuft weiter.
   useEffect(() => {
-    if (query.isError && !query.data) setRun(null)
-  }, [query.isError, query.data, setRun])
+    if (!query.data && shouldForgetRun(query.error)) setRun(null)
+  }, [query.error, query.data, setRun])
 
   return query
 }

@@ -346,6 +346,7 @@ class CellTask(BaseModel):
     task: Literal[tuple(CELL_TASKS)]  # type: ignore[valid-type]
     seed: int = Field(1000, ge=0)
     mode: Literal["mock"] = "mock"  # Dream-1 in the live cell is not wired yet; mock = scripted reference
+    request_id: str | None = Field(None, max_length=64)  # idempotency: a resent request is not run twice
 
 
 def _session() -> CellSession:
@@ -388,10 +389,16 @@ def cell_action(req: CellAction):
 @app.post("/cells/session/task", status_code=202)
 def cell_task(req: CellTask):
     session = _session()
-    if session.busy:
-        raise ApiError(409, "busy", f"task {session.busy} is running")
-    if CELL_TASKS[req.task]["cell"] != session.cell:
-        raise ApiError(400, "wrong_cell", f"task {req.task} belongs to cell {CELL_TASKS[req.task]['cell']}")
+    with session.lock:  # check and mark in one step: busy from enqueue on, not only once the session thread starts
+        if req.request_id and req.request_id in session.request_ids:
+            return {"queued": req.task, "duplicate": True, "motion": "scripted reference controller (not Dream-1)"}
+        if session.busy:
+            raise ApiError(409, "busy", f"task {session.busy} is running")
+        if CELL_TASKS[req.task]["cell"] != session.cell:
+            raise ApiError(400, "wrong_cell", f"task {req.task} belongs to cell {CELL_TASKS[req.task]['cell']}")
+        session.busy = req.task
+        if req.request_id:
+            session.request_ids.add(req.request_id)
     session.submit("task", task=req.task, seed=req.seed)
     return {"queued": req.task, "motion": "scripted reference controller (not Dream-1)"}
 
