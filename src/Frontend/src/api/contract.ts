@@ -418,6 +418,22 @@ export const CellResultsSchema = z.object({
 })
 export type CellResults = z.infer<typeof CellResultsSchema>
 
+// Checkpoint-Freigabe je Aufgabe (Backend /api/results/policy, Regeln im Backend, Zahlen aus den Messdaten)
+const PolicyModelSchema = z.object({ label: z.string(), name: z.string(), k: z.number().nullable() })
+export const PolicyRowSchema = z.object({
+  skill: z.string(),
+  name: z.string(),
+  scope: z.enum(['cell', 'outside']),
+  n: z.number(),
+  base: PolicyModelSchema.nullable(),
+  checkpoint: PolicyModelSchema.extend({ note: z.string() }).nullable(),
+  controller: z.object({ name: z.string(), k: z.number().nullable(), reason: z.string() }),
+  rejected: z.array(PolicyModelSchema.extend({ total: z.number(), reason: z.string() })),
+})
+export type PolicyRow = z.infer<typeof PolicyRowSchema>
+export const CheckpointPolicySchema = z.object({ robot: z.string(), generated_at: z.string(), rows: z.array(PolicyRowSchema) })
+export type CheckpointPolicy = z.infer<typeof CheckpointPolicySchema>
+
 // ---------------------------------------------------------------------------
 // Client-Schnittstelle – identisch für "real" und "mock" (N2)
 // ---------------------------------------------------------------------------
@@ -477,4 +493,5 @@ export interface ApiClient {
 
   listRobots(): Promise<Robot[]>
   getCellResults(): Promise<CellResults>
+  getCheckpointPolicy(): Promise<CheckpointPolicy>
 }

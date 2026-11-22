@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink } from 'lucide-react'
 import { api } from '@/api/client'
-import { OUTCOME_BUCKETS, type CellResults, type OutcomeBucket, type ResultModel } from '@/api/contract'
+import { OUTCOME_BUCKETS, type CellResults, type CheckpointPolicy, type OutcomeBucket, type ResultModel } from '@/api/contract'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
@@ -76,8 +76,71 @@ function SceneGrid({ data }: { data: CellResults }) {
   )
 }
 
+const score = (k: number | null | undefined, n: number) => (k == null ? '–' : `${k}/${n}`)
+
+/** Wie die Messung das Verhalten steuert: je Aufgabe Ausführung, zulässiger Checkpoint, abgelehnte mit Grund */
+export function PolicyTable({ policy }: { policy: CheckpointPolicy }) {
+  return (
+    <section>
+      <h3 className="mb-1 font-semibold">Entscheidung: welcher Checkpoint darf wohin?</h3>
+      <p className="mb-3 max-w-[80ch] text-sm text-slate-600">
+        Abgeleitet aus den Messungen unten. Freigegeben wird nach dem Gesamtergebnis auf 40 Szenen; je Aufgabe sind es nur 10
+        Szenen, zu wenig für eine eigene Entscheidung. Der Zellen-Fine-Tune gilt nur für diesen Roboter in den Zellen, nicht als
+        Standard für andere Skills. Grund steht beim Darüberfahren.
+      </p>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Aufgabe</TableHead>
+            <TableHead>führt im Workflow aus</TableHead>
+            <TableHead>zulässiger Checkpoint</TableHead>
+            <TableHead className="text-right">Basis</TableHead>
+            <TableHead>abgelehnt</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {policy.rows.map((r) => (
+            <TableRow key={r.skill} className={cn(r.scope === 'outside' && 'bg-amber-50')}>
+              <TableCell>
+                <div className="font-medium">{r.name}</div>
+                <div className="text-xs text-slate-600">{r.scope === 'cell' ? 'Zelle' : 'außerhalb der Zellen'}</div>
+              </TableCell>
+              <TableCell title={r.controller.reason}>
+                <Badge variant="secondary">{r.controller.name}</Badge>{' '}
+                <span className="tabular-nums">{score(r.controller.k, r.n)}</span>
+              </TableCell>
+              <TableCell title={r.checkpoint?.note} className="whitespace-normal">
+                {r.checkpoint ? (
+                  <>
+                    {r.checkpoint.name} <span className="tabular-nums">{score(r.checkpoint.k, r.n)}</span>
+                    {r.scope === 'outside' && <div className="text-xs text-slate-600">{r.checkpoint.note}</div>}
+                  </>
+                ) : (
+                  '–'
+                )}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">{score(r.base?.k, r.n)}</TableCell>
+              <TableCell className="min-w-[320px] whitespace-normal">
+                <ul className="space-y-0.5 text-xs">
+                  {r.rejected.map((x) => (
+                    <li key={x.label} title={x.reason} className={cn(r.scope === 'outside' && 'font-medium text-red-700')}>
+                      {x.name} <span className="tabular-nums">{score(x.k, r.n)}</span>
+                      {r.scope === 'outside' && <> – {x.reason}</>}
+                    </li>
+                  ))}
+                </ul>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </section>
+  )
+}
+
 export function ResultsView() {
   const results = useQuery({ queryKey: ['cell-results'], queryFn: () => api.getCellResults(), refetchInterval: 60_000 })
+  const policy = useQuery({ queryKey: ['checkpoint-policy'], queryFn: () => api.getCheckpointPolicy(), refetchInterval: 60_000 })
   const robots = useQuery({ queryKey: ['robots'], queryFn: () => api.listRobots(), refetchInterval: 60_000 })
   const data = results.data
   const robot = robots.data?.find((r) => r.name === 'yam-sim') ?? robots.data?.[0]
@@ -116,6 +179,9 @@ export function ResultsView() {
           Szene für Basis und Fine-Tune (McNemar).
         </p>
       </section>
+
+      {policy.data && <PolicyTable policy={policy.data} />}
+      {policy.isError && <p className="text-sm text-red-700">Freigabe nicht abrufbar: {policy.error.message}</p>}
 
       <section>
         <h3 className="mb-2 font-semibold">Erfolg auf {n} Szenen</h3>

@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -259,3 +260,44 @@ def test_cell_results_read_from_file(client: TestClient, settings: Settings, tmp
     assert client.get("/api/results/cells").json()["base"] == "snapshot"  # frischer Klon: Snapshot
     settings.cell_results_path.write_text('{"base": "beta-main", "models": []}')
     assert client.get("/api/results/cells").json() == {"base": "beta-main", "models": []}
+
+
+def test_checkpoint_policy_from_measurements(client: TestClient, settings: Settings, tmp_path: Path) -> None:
+    settings.cell_results_path = tmp_path / "missing.json"
+    settings.cell_results_snapshot_path = tmp_path / "snap" / "results.json"
+    assert client.get("/api/results/policy").status_code == 404
+    (tmp_path / "snap" / "raw").mkdir(parents=True)
+
+    def model(label: str, k: int, cnc: int) -> dict[str, Any]:
+        return {"label": label, "name": label, "k": k, "tasks": {"cnc_load": cnc}, "scenes": [0] * 10}
+
+    settings.cell_results_snapshot_path.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-11-22T15:00",
+                "base": "beta-main",
+                "tasks": ["cnc_load"],
+                "task_names": {"cnc_load": "Load CNC"},
+                "models": [
+                    model("expert", 10, 10),
+                    model("beta-main", 3, 3),
+                    model("ft-main", 7, 7),
+                    model("ft-lr3-main", 1, 1),
+                ],
+            }
+        )
+    )
+    fruit = {"paired": {"variants": [
+        {"label": "beta", "n": 20, "successes": 6},
+        {"label": "ft-main", "n": 20, "successes": 0, "vs_reference": {"reference": "beta", "gained": 0, "lost": 6}},
+    ]}}  # fmt: skip
+    (tmp_path / "snap" / "raw" / "fruit-forget.json").write_text(json.dumps(fruit))
+    rows = {r["skill"]: r for r in client.get("/api/results/policy").json()["rows"]}
+    cnc = rows["cnc_load"]
+    assert cnc["controller"]["name"].startswith("Referenz") and cnc["controller"]["k"] == 10
+    assert cnc["checkpoint"]["label"] == "ft-main" and cnc["checkpoint"]["k"] == 7
+    assert [(r["label"], r["k"]) for r in cnc["rejected"]] == [("ft-lr3-main", 1)]
+    banana = rows["pick-banana"]
+    assert banana["checkpoint"]["label"] == "beta" and banana["checkpoint"]["k"] == 6
+    assert banana["rejected"][0]["k"] == 0
+    assert "6/20 → 0/20" in banana["rejected"][0]["reason"] and "p = 0.031" in banana["rejected"][0]["reason"]

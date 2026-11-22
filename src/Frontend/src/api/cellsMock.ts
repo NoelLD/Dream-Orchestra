@@ -2,7 +2,7 @@
  * TESTMODUS für Zellen-Leitstand, Roboter und Fine-Tune-Ergebnisse. Spielt den Simulationsdienst nach
  * (src/Simulation/README.md, "Zellen-Experimente"); alle Daten sind erfunden und als Testdaten gekennzeichnet.
  */
-import type { ApiClient, Cell, CellAction, CellResults, CellSession, Robot } from './contract'
+import type { ApiClient, Cell, CellAction, CellResults, CellSession, CheckpointPolicy, Robot } from './contract'
 import { ApiError } from './realClient'
 
 type CellsApi = Pick<
@@ -16,6 +16,7 @@ type CellsApi = Pick<
   | 'cellFrameUrl'
   | 'listRobots'
   | 'getCellResults'
+  | 'getCheckpointPolicy'
 >
 
 export const MOCK_CELLS: readonly Cell[] = [
@@ -41,6 +42,33 @@ const scenes = (pattern: string) =>
   [...pattern].map((c): [string, boolean, string] =>
     c === 's' ? ['success', false, 'success'] : c === 'd' ? ['dropped', true, 'timeout_dropped'] : ['no_grasp', false, 'timeout_no_grasp'],
   )
+
+export const MOCK_POLICY: CheckpointPolicy = {
+  robot: 'yam-sim',
+  generated_at: '2026-11-22T00:00:00 (TESTDATEN)',
+  rows: [
+    {
+      skill: 'cnc_load',
+      name: 'Load CNC (Testdaten)',
+      scope: 'cell',
+      n: 10,
+      base: { label: 'beta-main', name: 'Basis', k: 3 },
+      checkpoint: { label: 'ft-main', name: 'Fine-tune c500', k: 7, note: 'nur in den Zellen' },
+      controller: { name: 'Referenz-Controller (geskriptet)', k: 10, reason: 'Testdaten' },
+      rejected: [{ label: 'ft-lr3-main', name: 'Fine-tune, lr 3e-5', k: 1, total: 20, reason: 'Testdaten' }],
+    },
+    {
+      skill: 'pick-banana',
+      name: 'Banane greifen (Testdaten)',
+      scope: 'outside',
+      n: 20,
+      base: { label: 'beta', name: 'Basis', k: 6 },
+      checkpoint: { label: 'beta', name: 'Basis', k: 6, note: 'Standard' },
+      controller: { name: 'Dream-1 beta (Basis)', k: 6, reason: 'Testdaten' },
+      rejected: [{ label: 'ft-main', name: 'Zellen-Fine-Tune', k: 0, total: 0, reason: 'Vergessen (Testdaten)' }],
+    },
+  ],
+}
 
 export const MOCK_RESULTS: CellResults = {
   generated_at: '2026-11-22T00:00:00',
@@ -162,5 +190,6 @@ export function createCellsMock(now: () => number): CellsApi {
     cellFrameUrl: (view, tick) => frame(view, session?.cell ?? 'keine Sitzung', tick),
     listRobots: async () => structuredClone([...MOCK_ROBOTS]),
     getCellResults: async () => structuredClone(MOCK_RESULTS),
+    getCheckpointPolicy: async () => structuredClone(MOCK_POLICY),
   }
 }

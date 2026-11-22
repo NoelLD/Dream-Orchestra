@@ -14,6 +14,7 @@ import {
   ApiErrorBodySchema,
   BackendStatusSchema,
   CellResultsSchema,
+  CheckpointPolicySchema,
   CellSchema,
   CellSessionSchema,
   DeviceSchema,
@@ -152,5 +153,6 @@ export function createRealClient(fetchFn: typeof fetch = (...args) => fetch(...a
 
     listRobots: () => request(z.array(RobotSchema), 'GET', '/simulation/robots'),
     getCellResults: () => request(CellResultsSchema, 'GET', '/results/cells'),
+    getCheckpointPolicy: () => request(CheckpointPolicySchema, 'GET', '/results/policy'),
   }
 }

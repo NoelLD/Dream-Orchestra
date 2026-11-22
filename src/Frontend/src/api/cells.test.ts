@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { MOCK_POLICY } from './cellsMock'
 import { createMockClient } from './mockClient'
 import { createRealClient } from './realClient'
 
@@ -80,6 +81,10 @@ describe('Zellen-Leitstand über den echten Client', () => {
     expect(data.models[1]?.p).toBe(0.057)
     const broken = createRealClient(fakeFetch(() => json({ ...results, models: 'x' })).fn)
     await expect(broken.getCellResults()).rejects.toThrow(/API-Vertrag/)
+    const policy = await createRealClient(fakeFetch(() => json(MOCK_POLICY)).fn).getCheckpointPolicy()
+    expect(policy.rows[1]?.rejected[0]?.k).toBe(0)
+    const badPolicy = createRealClient(fakeFetch(() => json({ ...MOCK_POLICY, rows: [{ skill: 'x' }] })).fn)
+    await expect(badPolicy.getCheckpointPolicy()).rejects.toThrow(/API-Vertrag/)
   })
 })
 
@@ -105,6 +110,7 @@ describe('Zellen-Leitstand im Testmodus', () => {
     expect(api.cellFrameUrl('overview', 1)).toMatch(/^data:image\/svg\+xml/)
     expect(decodeURIComponent(api.cellFrameUrl('overview', 1))).toContain('TESTMODUS')
     expect((await api.getCellResults()).models.length).toBeGreaterThan(1)
+    expect((await api.getCheckpointPolicy()).rows.map((r) => r.scope)).toEqual(['cell', 'outside'])
     expect((await api.listRobots())[0]?.name).toBe('yam-sim')
   })
 })

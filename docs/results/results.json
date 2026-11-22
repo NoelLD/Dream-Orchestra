@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-22T13:18:33",
+ "generated_at": "2026-11-22T14:04:05",
  "base": "beta-main",
  "tasks": [
   "sort_round",
@@ -1757,6 +1757,506 @@
    "win": 6,
    "loss": 6,
    "p": 1.0
+  },
+  {
+   "label": "ft-c1000-main",
+   "name": "Fine-tune c1000",
+   "what": "dose: 1000 steps",
+   "prereg": true,
+   "k": 13,
+   "lo": 0.20084316962661725,
+   "hi": 0.4798254191110201,
+   "contact": 17,
+   "buckets": {
+    "success": 13,
+    "dropped": 7,
+    "not_released": 0,
+    "no_grasp": 14,
+    "action_error": 6
+   },
+   "tasks": {
+    "sort_round": 4,
+    "sort_cube": 1,
+    "cnc_load": 2,
+    "cnc_unload": 6
+   },
+   "scenes": [
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     true,
+     "success"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     true,
+     "success"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     true,
+     "success"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     true,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     true,
+     "success"
+    ]
+   ],
+   "times": [
+    15.4,
+    16.4,
+    19.0,
+    22.6,
+    24.2,
+    24.2,
+    24.4,
+    24.8,
+    31.2,
+    31.6,
+    36.0,
+    41.2,
+    43.6
+   ],
+   "t_median": 24.4,
+   "within20": 3,
+   "within30": 8,
+   "both": 3,
+   "both_faster": 2,
+   "win": 10,
+   "loss": 3,
+   "p": 0.09228515625
+  },
+  {
+   "label": "ft-rep-g15",
+   "name": "Replicate, gripper clip 0.15",
+   "what": "exploratory: cost of gripper aborts",
+   "prereg": false,
+   "k": 17,
+   "lo": 0.28509168524815875,
+   "hi": 0.5780519956394001,
+   "contact": 14,
+   "buckets": {
+    "success": 17,
+    "dropped": 6,
+    "not_released": 0,
+    "no_grasp": 17,
+    "action_error": 0
+   },
+   "tasks": {
+    "sort_round": 3,
+    "sort_cube": 2,
+    "cnc_load": 9,
+    "cnc_unload": 3
+   },
+   "scenes": [
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "no_grasp",
+     false,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ]
+   ],
+   "times": [
+    18.6,
+    18.8,
+    19.2,
+    22.4,
+    22.6,
+    22.8,
+    23.0,
+    23.4,
+    24.0,
+    24.8,
+    24.8,
+    26.6,
+    26.6,
+    29.4,
+    31.8,
+    35.8,
+    36.0
+   ],
+   "t_median": 24.0,
+   "within20": 3,
+   "within30": 14,
+   "both": 3,
+   "both_faster": 1,
+   "win": 14,
+   "loss": 3,
+   "p": 0.012725830078125
   }
  ],
  "spend": {
@@ -1807,22 +2307,23 @@
    "calib-ft-r20": 0.37,
    "calib-ft-r30": 0.714,
    "ft-b05-main": 1.4,
+   "ft-c1000-main": 1.775,
    "ft-lr3-main": 1.481,
    "ft-main": 1.8,
-   "ft-rep-g15": 1.417,
+   "ft-rep-g15": 1.803,
    "ft-rep-main": 1.803
   },
   "credit": 1000.0,
   "dev": {
-   "calls": 1409,
+   "calls": 1475,
    "phases": {
     "Idea, research, team name": 12.41,
     "Simulation, cells, scripted expert, API": 80.11,
-    "Fine-tune data, training gates, evaluation, pages, integration": 62.45
+    "Fine-tune data, training gates, evaluation, pages, integration": 69.72
    },
-   "usd": 154.96,
-   "out_m": 1.49,
-   "cache_read_m": 379.5
+   "usd": 162.24,
+   "out_m": 1.54,
+   "cache_read_m": 398.5
   }
  },
  "queue": [
@@ -1854,13 +2355,13 @@
    "label": "ft-rep-g15",
    "name": "Replicate, gripper clip 0.15",
    "eta": "~13:55",
-   "done": false
+   "done": true
   },
   {
    "label": "ft-c1000-main",
    "name": "Fine-tune c1000",
    "eta": "~14:40",
-   "done": false
+   "done": true
   },
   {
    "label": "ft-rep2-main",

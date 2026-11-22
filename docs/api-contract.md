@@ -34,6 +34,8 @@ Diese Datei fasst es zusammen und beschreibt, wie das Frontend es nutzt.
 | GET/POST | `/api/training/finetune`, `GET …/{job_id}` | Fine-Tuning (kostet Credits, `confirm_cost_usd`) | – |
 | GET | `/api/simulation/skills`, `/api/simulation/runs/{run_id}` | Skills und Laufdetails des Simulationsdienstes | – |
 | GET | `/api/simulation/runs/{run_id}/video`, `/api/simulation/frame.jpg` | MP4 nach Laufende, Livebild (F16) | – |
+| GET | `/api/results/cells` | Fine-Tune-Ergebnisse (lokal gemessen, sonst Snapshot `docs/results/results.json`) | `getCellResults()` → Tab „Roboter & Fine-Tune“ |
+| GET | `/api/results/policy` | Checkpoint-Freigabe je Aufgabe: `rows[]` mit `controller` (führt im Workflow aus), `checkpoint` (zulässig), `base`, `rejected[]` (`k`, `total`, `reason`); Zahlen aus den Messdaten inkl. `fruit-forget.json` | `getCheckpointPolicy()` → Tabelle „Entscheidung“ |
 
 ## Workflow: Editor-Format ↔ Backend-Format
 
