@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-22T15:52:30",
+ "generated_at": "2026-11-22T16:09:52",
  "base": "beta-main",
  "tasks": [
   "sort_round",
@@ -2565,19 +2565,19 @@
    "ft-rep-main": 1.803,
    "ft-rep2-main": 1.669,
    "xfer-beta": 0.531,
-   "xfer-ft-main": 0.319
+   "xfer-ft-main": 0.994
   },
   "credit": 1000.0,
   "dev": {
-   "calls": 1603,
+   "calls": 1633,
    "phases": {
     "Idea, research, team name": 12.41,
     "Simulation, cells, scripted expert, API": 80.11,
-    "Fine-tune data, training gates, evaluation, pages, integration": 77.35
+    "Fine-tune data, training gates, evaluation, pages, integration": 81.65
    },
-   "usd": 169.86,
-   "out_m": 1.63,
-   "cache_read_m": 419.3
+   "usd": 174.17,
+   "out_m": 1.65,
+   "cache_read_m": 426.9
   }
  },
  "queue": [

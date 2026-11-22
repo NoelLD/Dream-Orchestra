@@ -90,8 +90,9 @@ which checkpoint may run which task (`GET /api/results/policy`).
 
 **Limits:** simulation only; runs with arm–cell contact go up with fine-tuning (8 → 13–17 of 40), so no safety
 claim; per-task results are not stable across trainings. The cell fine-tune forgets outside the cells: banana
-6/20 (base) → 0/20, 6 : 0 paired, which meets the pre-registered "harms" rule, so cell checkpoints stay cell-only. A transfer test on an untrained, similar task is
-pre-registered in [`docs/results/TRANSFER_PREREG.md`](docs/results/TRANSFER_PREREG.md).
+6/20 (base) → 0/20, 6 : 0 paired, which meets the pre-registered "harms" rule, so cell checkpoints stay cell-only. **Transfer test** (pre-registered in [`docs/results/TRANSFER_PREREG.md`](docs/results/TRANSFER_PREREG.md)): on
+`cnc_return`, a similar CNC task never trained, the expert solves 20/20, the base 1/20 and the c500 fine-tune 0/20
+(paired 0 : 1). By the pre-registered rule: **transfer not shown**. The fine-tune helps on the trained tasks only.
 
 ![Decision table in the app: per task, who runs it today, the base model's score and the approved fine-tune; the banana row shows the cell fine-tune dropping 6/20 to 0/20, so it is excluded there; below, every other fine-tune with its 40-scene score and why it was not approved](docs/img/decision-table.png)
 
