@@ -148,6 +148,8 @@ class Engine:
         self.blocks = {block.id: block for block in definition.blocks}
         self.edges = {(edge.source, edge.port): edge.target for edge in definition.edges}
         self._dream_run: str | None = None
+        self._cell_used = False  # Lauf hat die Zelle benutzt: STOP hält dann auch die Zelle an
+        self._cell_devices: frozenset[str] = getattr(dream, "cell_devices", frozenset())
         self.handled_errors = 0  # Fehler, die über einen Fehlerpfad weitergeführt wurden
 
     async def run(self) -> None:
@@ -169,6 +171,7 @@ class Engine:
             raise RunFailed(f"Schrittlimit von {self.settings.max_steps} Blöcken erreicht (Endlosschleife?)")
         except asyncio.CancelledError:
             await self._stop_dream_run()
+            await self._halt_cell()
             raise
 
     async def _execute(self, block: Block) -> Port:
@@ -193,6 +196,9 @@ class Engine:
         raise RunFailed(f"Block '{block.id}': {message}")
 
     async def _dispatch(self, block: Block, params: BaseModel) -> Port:
+        device = getattr(params, "device", None)
+        if device is not None and device in self._cell_devices:
+            self._cell_used = True
         if isinstance(params, PromptParams):
             return await self._prompt(block, params)
         if isinstance(params, WaitSensorParams):
@@ -229,7 +235,9 @@ class Engine:
             if attempt > 1:
                 await self.control.gate()
             started = time.monotonic()
-            if params.prompt.strip().lower() not in getattr(self.dream, "cell_prompts", frozenset()):
+            if params.prompt.strip().lower() in getattr(self.dream, "cell_prompts", frozenset()):
+                self._cell_used = True
+            else:
                 self.sink.credits_used(1)  # Zellen-Tasks laufen geskriptet und kosten nichts
             try:
                 run = await asyncio.wait_for(
@@ -238,6 +246,7 @@ class Engine:
                 status, ok = run.status, run.status == "succeeded"
                 detail = f"{run.run_id}: {run.status}, {run.api_calls} API-Aufrufe, {run.cost_usd:.4f} $"
                 detail += f", {run.error}" if run.error else ""
+                detail += f", {run.note}" if run.note else ""
             except TimeoutError:
                 await self._stop_dream_run()
                 status, ok, detail = "timeout", False, f"Zeitlimit {timeout:g} s überschritten"
@@ -292,12 +301,28 @@ class Engine:
         read = getattr(self.devices, "read", None)
         return read(device_id) if read is not None else self.devices.get(device_id)
 
+    async def _halt_cell(self) -> None:
+        """STOP mitten im Zellen-Ablauf (z. B. beim Warten auf „Maschine fertig“): Zelle wirklich anhalten."""
+        halt = getattr(self.dream, "halt_cell", None)
+        if not self._cell_used or halt is None:
+            return
+        try:
+            if await asyncio.shield(halt()):
+                self.sink.log(
+                    "STOP: Zelle angehalten (Zellen-Sitzung beendet, Maschine und Arme stehen)", level="warning"
+                )
+        except Exception as exc:
+            self.sink.log(f"STOP: Zelle ließ sich nicht anhalten: {exc}", level="error")
+
     async def _stop_dream_run(self) -> None:
         run_id, self._dream_run = self._dream_run, None
         if run_id is None:
             return
         try:
             await asyncio.shield(self.dream.stop(run_id))
-            self.sink.log(f"Dream-Lauf {run_id} gestoppt", level="warning")
+            if run_id.startswith("geskriptet-"):  # Zellen-Task: stop() beendet die Zellen-Sitzung
+                self.sink.log(f"Zellen-Task {run_id} gestoppt, Zelle angehalten (Sitzung beendet)", level="warning")
+            else:
+                self.sink.log(f"Dream-Lauf {run_id} gestoppt", level="warning")
         except Exception as exc:
             self.sink.log(f"Dream-Lauf {run_id} ließ sich nicht stoppen: {exc}", level="error")

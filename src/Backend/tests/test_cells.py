@@ -7,7 +7,7 @@ import httpx
 import pytest
 
 from app.devices.adapter import DeviceRegistry, VirtualAdapter
-from app.dream.cells import CELL_DEVICES, CellBridge, CellDreamClient, cell_task_for
+from app.dream.cells import CELL_DEVICES, REFILL_NOTE, CellBridge, CellDreamClient, cell_task_for
 from app.dream.client import DreamError, DreamRun
 from app.dream.simulation import SimulationApi
 from app.errors import ConflictError, UpstreamError
@@ -38,6 +38,7 @@ class FakeCells:
         self.finished_part = False
         self.block_cycle = False
         self.cycle_left = 0
+        self.deletes = 0
 
     def _event(self, text: str, **data: object) -> None:
         assert self.session is not None
@@ -72,6 +73,7 @@ class FakeCells:
                     self.cycle_left -= 1
                     if self.cycle_left == 0:
                         self.session["sensors"].update(machine_running=False, machine_done=True)
+                        self.session["sensors"]["cycles"] = self.session["sensors"].get("cycles", 0) + 1
                         self.finished_part = True
                 if self.session["busy"] and self.left > 0:
                     self.left -= 1
@@ -106,6 +108,7 @@ class FakeCells:
                         self.cycle_left = 2  # Abfragen bis "fertig"
                 return httpx.Response(202, json={"queued": body["action"]})
             case "DELETE", "/cells/session":
+                self.deletes += 1
                 self.session = None
                 return httpx.Response(204)
         return httpx.Response(404, json={"error": "not_found", "detail": request.url.path})
@@ -396,3 +399,98 @@ def test_devices_api_reports_unavailable_cell_sensor(tmp_path: pathlib.Path) -> 
     assert sensor["available"] is False and "nicht verfügbar" in sensor["unavailable_reason"]
     assert devices["zelle-ampel-rot"]["available"] is True  # actuators have no freshness
     assert devices["lichtschranke"]["available"] is True
+
+
+@pytest.mark.asyncio
+async def test_stop_while_waiting_for_machine_halts_the_cell() -> None:
+    """Codex #1: STOP während „Maschine läuft“ beendet die Zellen-Sitzung, statt die Maschine weiterlaufen zu lassen."""
+    import asyncio
+
+    from app.engine.engine import Engine, EngineSettings
+    from tests.test_engine import ListSink, wf
+
+    fake = FakeCells()
+    api = SimulationApi("http://sim", transport=httpx.MockTransport(fake))
+    await api.request("POST", "/cells/cnc/session")
+    fake.session["sensors"]["raw_part_on_tray"] = True  # type: ignore[index]
+    registry, _ = registry_with(api)
+    definition = wf(
+        [
+            ("s", "start", {}),
+            ("m", "set_actuator", {"device": "zelle-cnc-maschine", "value": True}),
+            ("w", "wait_sensor", {"device": "zelle-maschine-fertig", "operator": "==", "value": True}),
+            ("e", "end", {}),
+        ],
+        [("s", "m", "next"), ("m", "w", "next"), ("w", "e", "next")],
+    )
+    sink = ListSink()
+    engine = Engine(
+        definition,
+        dream=client(fake),
+        devices=registry,
+        skills={},
+        sink=sink,
+        settings=EngineSettings(poll_interval_s=0.01, sensor_poll_interval_s=0.01),
+    )
+    task = asyncio.create_task(engine.run())
+    await asyncio.sleep(0.2)
+    assert sink.blocks[-1] == "w" and fake.session["sensors"]["machine_running"]  # type: ignore[index]
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert fake.deletes == 1 and fake.session is None
+    assert any("Zelle angehalten" in e["message"] for e in sink.entries)
+
+
+@pytest.mark.asyncio
+async def test_stop_without_cell_use_leaves_the_cell_alone() -> None:
+    import asyncio
+
+    from app.engine.engine import Engine
+    from tests.test_engine import ListSink, wf
+
+    fake = FakeCells()
+    dream = client(fake)
+    await dream.api.request("POST", "/cells/cnc/session")
+    definition = wf(
+        [("s", "start", {}), ("t", "wait_time", {"seconds": 5}), ("e", "end", {})],
+        [("s", "t", "next"), ("t", "e", "next")],
+    )
+    engine = Engine(definition, dream=dream, devices=VirtualAdapter(), skills={}, sink=ListSink())
+    task = asyncio.create_task(engine.run())
+    await asyncio.sleep(0.05)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert fake.deletes == 0 and fake.session is not None
+
+
+@pytest.mark.asyncio
+async def test_second_load_gets_a_new_blank() -> None:
+    """Codex #4: nach einem Zyklus ist das Rohteil verbraucht; der nächste Ladeauftrag startet die Sitzung neu."""
+    fake = FakeCells(polls_per_task=1)
+    dream = client(fake)
+    first = await finish(dream, await dream.start(skill="cnc_load", prompt="", checkpoint=None))
+    assert first.success and first.note is None and fake.deletes == 0
+    fake.session["sensors"]["cycles"] = 1  # type: ignore[index]  # Maschine lief, Rohteil verbraucht
+    second = await finish(dream, await dream.start(skill="cnc_load", prompt="", checkpoint=None))
+    assert second.success and second.note == REFILL_NOTE and fake.deletes == 1
+
+
+@pytest.mark.asyncio
+async def test_session_start_survives_a_slow_simulation() -> None:
+    """Live 22.11.: Zellenaufbau unter Last, der Dienst antwortet > 10 s nicht -> weiter warten, nicht Fehlerpfad."""
+    fake = FakeCells(polls_per_task=1)
+    hiccups = {"left": 3}
+
+    def flaky(request: httpx.Request) -> httpx.Response:
+        if request.url.path.startswith("/cells/") and hiccups["left"] > 0 and fake.session is not None:
+            hiccups["left"] -= 1
+            raise httpx.ReadError("slow", request=request)
+        return fake(request)
+
+    dream = CellDreamClient(
+        NoDream(), SimulationApi("http://sim", transport=httpx.MockTransport(flaky)), allow_scripted=True, poll_s=0.01
+    )
+    run = await finish(dream, await dream.start(skill="cnc_load", prompt="", checkpoint=None))
+    assert run.success and hiccups["left"] == 0

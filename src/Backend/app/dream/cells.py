@@ -22,9 +22,12 @@ from app.dream.client import DreamClient, DreamError, DreamRun
 from app.dream.simulation import SimulationApi
 from app.errors import ConflictError, UpstreamError
 
-SESSION_START_S = 30.0  # Zelle bauen + erstes Bild
+SESSION_START_S = 90.0  # Zelle bauen + erstes Bild; unter Last antwortet der Dienst währenddessen kurz nicht
+BUSY_CODES = frozenset({"busy", "simulation_unavailable"})  # beim Start: weiter warten statt abbrechen
 REFERENCE = "referenz"  # Checkpoint-Wert: Zellen-Task ausdrücklich mit dem geskripteten Referenz-Controller
 CYCLE_ACK_S = 5.0  # so lange auf "Maschine läuft" oder eine Sperre warten
+REFILL_TASKS = frozenset({"cnc_load"})  # brauchen ein frisches Rohteil; die Simulation hat keine Zuführung
+REFILL_NOTE = "neues Rohteil: Zellen-Sitzung neu gestartet (Simulation ohne Teilezuführung)"
 
 _SPEC = [  # (ID, Name, Typ, Sensor in der Sitzung oder None für reine Aktoren)
     ("zelle-maschine-fertig", "Zelle: Maschine fertig", DeviceType.SWITCH, "machine_done"),
@@ -63,6 +66,16 @@ def _after(events: list[dict[str, Any]], marker: tuple[float, str] | None) -> li
     return events[keys.index(marker) + 1 :] if marker in keys else events
 
 
+def _blank_used(session: dict[str, Any]) -> bool:
+    """Das Rohteil dieser Sitzung ist verbraucht: ein Maschinenzyklus lief oder ein Laden war schon erfolgreich."""
+    if int((session.get("sensors") or {}).get("cycles") or 0) >= 1:
+        return True
+    return any(
+        (e.get("result") or {}).get("task") in REFILL_TASKS and (e.get("result") or {}).get("passed")
+        for e in session.get("events") or []
+    )
+
+
 def _marker(session: dict[str, Any] | None) -> tuple[float, str] | None:
     events = (session or {}).get("events") or []
     return (events[-1]["t"], events[-1]["text"]) if events else None
@@ -77,12 +90,28 @@ class CellDreamClient:
         self.poll_s = poll_s
         self._cells: list[dict[str, Any]] | None = None
         self._runs: dict[str, tuple[str, tuple[float, str] | None]] = {}  # run_id -> (task, letztes Ereignis davor)
+        self._notes: dict[str, str] = {}  # run_id -> Hinweis fürs Protokoll
         self._ids = itertools.count(1)
 
     @property
     def cell_prompts(self) -> frozenset[str]:
         """Prompts der Zellen-Tasks (klein geschrieben); die Prüfung vor dem Start verlangt dafür keinen Skill."""
         return frozenset(t["prompt"].strip().lower() for c in self._cells or [] for t in c["tasks"])
+
+    @property
+    def cell_devices(self) -> frozenset[str]:
+        """Geräte-IDs der Zelle; die Engine merkt sich daran, dass ein Lauf die Zelle benutzt."""
+        return frozenset(CELL_DEVICES)
+
+    async def halt_cell(self) -> bool:
+        """STOP: Zellen-Sitzung beenden, damit Arm und Maschine anhalten. True, wenn eine Sitzung lief."""
+        if await self._session() is None:
+            return False
+        try:
+            await self.api.request("DELETE", "/cells/session")
+        except UpstreamError as exc:
+            raise DreamError(exc.detail) from exc
+        return True
 
     async def prime(self, retry_s: float = 5.0) -> None:
         """Zellen-Liste laden, bis der Simulationsdienst antwortet (beim Start des Backends, im Hintergrund)."""
@@ -109,14 +138,21 @@ class CellDreamClient:
     async def _ensure_session(self, cell: str) -> dict[str, Any]:
         session = await self._session()
         if session is None or session.get("cell") != cell:
+            deadline = time.monotonic() + SESSION_START_S
             try:
                 await self.api.request("POST", f"/cells/{cell}/session")
             except UpstreamError as exc:
-                raise DreamError(exc.detail) from exc
-            deadline = time.monotonic() + SESSION_START_S
-            while (session := await self._session()) is None or session.get("status") != "running":
+                if exc.code != "simulation_unavailable":  # Zeitüberschreitung beim Aufbau: Sitzung entsteht trotzdem
+                    raise DreamError(exc.detail) from exc
+            while True:
+                try:
+                    session = await self._session()
+                except DreamError:
+                    session = None  # Dienst baut die Zelle und antwortet kurz nicht
+                if session is not None and session.get("status") == "running":
+                    break
                 if time.monotonic() > deadline:
-                    raise DreamError(f"Zelle {cell} startet nicht")
+                    raise DreamError(f"Zelle {cell} startet nicht innerhalb von {SESSION_START_S:g} s")
                 await asyncio.sleep(self.poll_s)
         return session
 
@@ -137,6 +173,13 @@ class CellDreamClient:
                 f"Checkpoint '{REFERENCE}' setzen, um den Referenz-Controller ausdrücklich zu wählen."
             )
         session = await self._ensure_session(cell)
+        note = None
+        if task in REFILL_TASKS and _blank_used(session):
+            try:
+                await self.api.request("DELETE", "/cells/session")
+            except UpstreamError as exc:
+                raise DreamError(exc.detail) from exc
+            session, note = await self._ensure_session(cell), REFILL_NOTE
         marker = _marker(session)
         deadline = time.monotonic() + SESSION_START_S
         while True:
@@ -144,12 +187,14 @@ class CellDreamClient:
                 await self.api.request("POST", "/cells/session/task", {"task": task})
                 break
             except UpstreamError as exc:
-                if exc.code == "busy" and time.monotonic() < deadline:
+                if exc.code in BUSY_CODES and time.monotonic() < deadline:
                     await asyncio.sleep(self.poll_s)
                     continue
                 raise DreamError(exc.detail) from exc
         run_id = f"geskriptet-{task}-{next(self._ids)}"
         self._runs[run_id] = (task, marker)
+        if note:
+            self._notes[run_id] = note
         return run_id
 
     async def status(self, run_id: str) -> DreamRun:
@@ -164,7 +209,8 @@ class CellDreamClient:
             if result and result.get("task") == task:
                 ok = bool(result.get("passed"))
                 error = None if ok else f"Referenz-Controller: {result.get('reason')}"
-                return DreamRun(run_id, "succeeded" if ok else "failed", ok, error=error)
+                note = self._notes.pop(run_id, None)
+                return DreamRun(run_id, "succeeded" if ok else "failed", ok, error=error, note=note)
             text = event["text"]  # vom Task selbst gesperrt (z. B. Entladen ohne Fertigteil, falsche Zelle)
             if event.get("gate") is False and (task in text or text.startswith("Entladen gesperrt")):
                 return DreamRun(run_id, "failed", False, error=text)

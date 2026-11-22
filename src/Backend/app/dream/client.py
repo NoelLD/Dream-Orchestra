@@ -20,6 +20,7 @@ class DreamRun:
     api_calls: int = 0
     cost_usd: float = 0.0
     error: str | None = None
+    note: str | None = None  # Hinweis fürs Protokoll (z. B. Zelle neu bestückt)
 
     @property
     def terminal(self) -> bool:

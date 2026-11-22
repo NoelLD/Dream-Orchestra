@@ -44,7 +44,8 @@ someone has to know how often it succeeds there. Today that means custom glue co
 
 1. **Skills**: a Dream-1 prompt per robot type, e.g. *"put the metal block on the machine tray"*.
 2. **Workflow**: the visual editor chains skills with *Aktor setzen*, *Warte auf Sensor*, *Bedingung* and an error
-   path. The backend engine runs it (pause, single step, STOP at any time).
+   path. The backend engine runs it (pause, single step, STOP at any time; STOP during a cell step also halts the
+   cell). Run it twice in a row: the second load restarts the cell with a fresh blank (the simulation has no feeder).
 3. **Cell and devices**: sensors and actuators are devices with an adapter (virtual today, MQTT and OPC UA settings
    prepared). In `sim` mode the cell devices (`zelle-*`) mirror a live MuJoCo cell: CNC machine with door, tray and
    stack light, or a sorting conveyor.
@@ -79,7 +80,8 @@ From [`docs/results/report_corrected.md`](docs/results/report_corrected.md), 40 
 | 50 % Dream base data mixed in | 6/40 | 6 : 6, p = 1.0 | 5 |
 
 **Limits:** simulation only; runs with arm–cell contact go up with fine-tuning (8 → 13–17 of 40), so no safety
-claim; per-task results are not stable across trainings. A transfer test on an untrained, similar task is
+claim; per-task results are not stable across trainings. The cell fine-tune forgets outside the cells: banana
+6/20 (base) → 0/20, 6 : 0 paired, which meets the pre-registered "harms" rule, so cell checkpoints stay cell-only. A transfer test on an untrained, similar task is
 pre-registered in [`docs/results/TRANSFER_PREREG.md`](docs/results/TRANSFER_PREREG.md).
 
 ## Questions we expect
