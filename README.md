@@ -76,8 +76,14 @@ From [`docs/results/report_corrected.md`](docs/results/report_corrected.md), 40 
 | Dream-1 beta, two runs | 6/40, 7/40 | 11 scenes flip between the runs | 4, 2 |
 | Fine-tune, 160 cell demos | 14/40 | 11 : 3, p = 0.057 | 13 |
 | Same recipe, second training | 17/40 | 14 : 3, p = 0.013 | 12 |
+| Same recipe, third training | 16/40 | 13 : 3, p = 0.021 | – |
 | Learning rate 3e-5 | 20/40 | 19 : 5, p = 0.007 | 20 |
 | 50 % Dream base data mixed in | 6/40 | 6 : 6, p = 1.0 | 5 |
+| Twice the steps (1000) | 13/40 | 10 : 3, p = 0.092 | – |
+
+The same recipe trained three times gives 14, 17 and 16 of 40, against 6 for the base: the gain is repeatable.
+Twice the training steps did not help. The app's *Robot & Fine-tune* tab turns these numbers into a decision:
+which checkpoint may run which task (`GET /api/results/policy`).
 
 **Limits:** simulation only; runs with arm–cell contact go up with fine-tuning (8 → 13–17 of 40), so no safety
 claim; per-task results are not stable across trainings. The cell fine-tune forgets outside the cells: banana
