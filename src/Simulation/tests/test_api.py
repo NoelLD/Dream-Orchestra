@@ -147,3 +147,27 @@ def test_finetune_validates_new_knobs_before_spending():
     bad = client.post("/finetune", json={"dataset": "x", "suffix": "x", "steps": 500, "confirm_cost_usd": 100,
                                          "resume_from": "not-a-model"})
     assert bad.status_code == 400
+
+
+def test_cell_session_gates_the_machine_cycle():
+    cells = {c["cell"]: c for c in client.get("/cells").json()}
+    assert set(cells) == {"conveyor", "cnc"} and {t["task"] for t in cells["cnc"]["tasks"]} == {"cnc_load", "cnc_unload"}
+    assert client.post("/cells/nope/session").status_code == 404
+    assert client.post("/cells/cnc/session").status_code == 202
+    try:
+        deadline = time.time() + 120
+        while time.time() < deadline and client.get("/cells/session").json().get("status") != "running":
+            time.sleep(1)
+        state = client.get("/cells/session").json()
+        assert state["status"] == "running" and state["sensors"]["door_open"] and state["sensors"]["tray_out"]
+        wrong = client.post("/cells/session/task", json={"task": "sort_cube"})
+        assert wrong.status_code == 400 and wrong.json()["error"] == "wrong_cell"
+        client.post("/cells/session/action", json={"action": "cycle_start"})  # no raw part on the tray yet
+        while time.time() < deadline and not any("gesperrt" in e["text"] for e in client.get("/cells/session").json()["events"]):
+            time.sleep(0.5)
+        state = client.get("/cells/session").json()
+        assert any("gesperrt" in e["text"] for e in state["events"]) and state["sensors"]["stack_light"] == "red"
+        assert state["sensors"]["cycles"] == 0
+    finally:
+        assert client.delete("/cells/session").status_code == 204
+    assert client.get("/cells/session").status_code == 409

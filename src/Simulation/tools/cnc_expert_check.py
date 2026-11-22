@@ -21,11 +21,10 @@ import mujoco  # noqa: E402
 import numpy as np  # noqa: E402
 import yam_env  # noqa: E402
 
-from app.cnc import CellController, cnc_xml  # noqa: E402
+from app.cnc import CellController, cell_xml  # noqa: E402
 from app.cnc_expert import TASKS, run_episode  # noqa: E402
 
 _original = yam_env.build_xml
-yam_env.build_xml = lambda: cnc_xml(_original())
 
 
 def seeds_arg(text: str) -> list[int]:
@@ -36,20 +35,21 @@ def seeds_arg(text: str) -> list[int]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seeds", type=seeds_arg, default=seeds_arg("1000-1003"))
-    parser.add_argument("--tasks", default="load,unload")
+    parser.add_argument("--tasks", default="sort_round,sort_cube,cnc_load,cnc_unload")
     parser.add_argument("--video", type=Path)
     args = parser.parse_args()
     frames: list[np.ndarray] = []
     results = []
     for seed in args.seeds:
         for task in args.tasks.split(","):
+            yam_env.build_xml = lambda c=TASKS[task]["cell"]: cell_xml(_original(), c)
             env = yam_env.YamEnv()
             ctrl = CellController(env)
             if args.video:
                 renderer = mujoco.Renderer(env.model, height=360, width=640)
                 cam = mujoco.MjvCamera()
                 cam.lookat[:] = [0.0, -0.08, 0.88]
-                cam.distance, cam.azimuth, cam.elevation = 1.45, -150.0 if task == "load" else -30.0, -24.0
+                cam.distance, cam.azimuth, cam.elevation = 1.5, -150.0 if TASKS[task]["arm"] == "left" else -30.0, -26.0
                 original_step = env.step
 
                 def step(left, right, _orig=original_step, _r=renderer, _c=cam, _e=env):

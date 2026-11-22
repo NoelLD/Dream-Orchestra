@@ -327,6 +327,90 @@ def get_finetune(job_id: str):
             "finished_at": job.get("finished_at")}
 
 
+# ---- live cell session (control room) -----------------------------------------------------------------------
+from .cell_session import CellSession  # noqa: E402
+from .cnc import CELLS  # noqa: E402
+from .cnc_expert import TASKS as CELL_TASKS  # noqa: E402
+
+cell_box: list[CellSession | None] = [None]
+CELL_ACTIONS = ("door_open", "door_close", "belt_on", "belt_off", "cycle_start", "light_red", "light_yellow",
+                "light_green", "light_off", "auto_on", "auto_off", "feed")
+
+
+class CellAction(BaseModel):
+    action: Literal[CELL_ACTIONS]  # type: ignore[valid-type]
+
+
+class CellTask(BaseModel):
+    task: Literal[tuple(CELL_TASKS)]  # type: ignore[valid-type]
+    seed: int = Field(1000, ge=0)
+    mode: Literal["mock"] = "mock"  # Dream-1 in the live cell is not wired yet; mock = scripted reference
+
+
+def _session() -> CellSession:
+    if cell_box[0] is None:
+        raise ApiError(409, "no_session", "no cell session; POST /cells/{cell}/session first")
+    return cell_box[0]
+
+
+@app.get("/cells")
+def list_cells():
+    """The two cell experiments and their tasks."""
+    return [{"cell": c, "tasks": [{"task": t, "arm": v["arm"], "prompt": v["prompt"]}
+                                  for t, v in CELL_TASKS.items() if v["cell"] == c]} for c in CELLS]
+
+
+@app.post("/cells/{cell}/session", status_code=202)
+def start_cell(cell: str):
+    """Start (or restart) the live session of a cell; the previous session is closed."""
+    if cell not in CELLS:
+        raise ApiError(404, "unknown_cell", f"no cell {cell!r}; see GET /cells")
+    if cell_box[0] is not None:
+        cell_box[0].close()
+    cell_box[0] = CellSession(cell)
+    return cell_box[0].public()
+
+
+@app.get("/cells/session")
+def cell_state():
+    """Sensors, actuators, busy task, last check result and the latest events."""
+    return _session().public()
+
+
+@app.post("/cells/session/action", status_code=202)
+def cell_action(req: CellAction):
+    session = _session()
+    session.submit("action", action=req.action)
+    return {"queued": req.action}
+
+
+@app.post("/cells/session/task", status_code=202)
+def cell_task(req: CellTask):
+    session = _session()
+    if session.busy:
+        raise ApiError(409, "busy", f"task {session.busy} is running")
+    if CELL_TASKS[req.task]["cell"] != session.cell:
+        raise ApiError(400, "wrong_cell", f"task {req.task} belongs to cell {CELL_TASKS[req.task]['cell']}")
+    session.submit("task", task=req.task, seed=req.seed)
+    return {"queued": req.task, "motion": "scripted reference controller (not Dream-1)"}
+
+
+@app.get("/cells/session/frame.jpg")
+def cell_frame(view: Literal["overview", "robot"] = "overview"):
+    jpeg = _session().frame(view)
+    if jpeg is None:
+        raise ApiError(404, "no_frame", "no frame yet")
+    return Response(jpeg, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+
+@app.delete("/cells/session", status_code=204)
+def stop_cell():
+    if cell_box[0] is not None:
+        cell_box[0].close()
+        cell_box[0] = None
+    return Response(status_code=204)
+
+
 # ---- budget & evaluations ------------------------------------------------------------------------------------
 @app.get("/budget")
 def budget():

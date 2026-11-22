@@ -177,6 +177,45 @@ Antwort `200`, Status zuerst `stopping`, dann `stopped`. Im Modus `dream` greift
 - `video`: `video/mp4` mit 5 fps, 320×270 (Draufsicht oben, beide Handgelenkkameras unten). Es sind dieselben Bilder, die Dream-1 sieht. `404`, solange der Lauf nicht terminal ist.
 - `frame.jpg`: neueste Draufsicht (320×180) des laufenden oder letzten Laufs, sonst die Startszene (640×360). Für eine Live-Kachel reicht Polling alle 200–500 ms.
 
+### Zellen-Experimente: Fließband und CNC (Leitstand)
+
+Zwei eigene Szenen statt der Obst-Szene (`app/cnc.py`), je ein Experiment:
+
+| Zelle | Aufbau | Tasks (Arm) |
+|---|---|---|
+| `conveyor` | Zuführband mit Alu-Rohlingen, Lichtschranke + Anschlag, blaue KLT-Kiste | `belt_to_klt` (links): Rohling vom Anschlag in die KLT |
+| `cnc` | Maschine mit Hubtür, Übergabeplatte (Palettenwechsler-Prinzip), Ampel; Bereitstellplatz, grüne Ablage | `cnc_load` (links): Rohteil auf die Platte · `cnc_unload` (rechts): Fertigteil in die Ablage |
+
+Die Übergabeplatte steht **vor** der Tür: Der YAM erreicht den Innenraum nicht (top-down bei x = 0 nur bis y ≈ −0,10).
+Die Maschine zieht die Platte selbst hinein (Zyklus: Tür zu, Platte rein, Ampel gelb, Rohteil wird Fertigteil, Tür auf,
+Platte raus, Ampel grün).
+
+**Live-Sitzung** (eine zur Zeit; Zustand bleibt erhalten, Echtzeit, Kamerabilder 5 fps):
+
+| Methode | Pfad | Zweck |
+|---|---|---|
+| `GET` | `/cells` | Zellen und ihre Tasks mit Prompt |
+| `POST` | `/cells/{cell}/session` | Sitzung starten (beendet die vorige) |
+| `GET` | `/cells/session` | `status`, `sim_seconds`, `busy`, `sensors`, `last_result`, `events` |
+| `POST` | `/cells/session/action` | `{"action": …}`: `door_open`, `door_close`, `belt_on`, `belt_off`, `cycle_start`, `light_red|yellow|green|off` |
+| `POST` | `/cells/session/task` | `{"task": "cnc_load", "seed": 1000}`; `409 busy`, `400 wrong_cell` |
+| `GET` | `/cells/session/frame.jpg?view=overview|robot` | Live-Bild: Übersicht oder Roboterkamera |
+| `DELETE` | `/cells/session` | beenden |
+
+Sensoren `cnc`: `door_open`, `door_closed`, `tray_out`, `tray_in`, `raw_part_on_tray`, `finished_part_on_tray`,
+`machine_running`, `machine_done`, `stack_light`, `cycles`; `conveyor`: `part_at_light_barrier`, `belt_on`.
+
+**Freigabe-Logik:** `cycle_start` ohne Rohteil auf der Platte wird gesperrt (Ampel rot). Ein Task gilt als bestanden,
+wenn das Teil ruhig im Zielbereich liegt (losgelassen) **und** der Arm die Zelle nicht berührt hat (Kontakt tiefer als
+0,5 mm, Arm gegen Zelle; Arm–Arm und Teil–Umgebung werden nicht geprüft). Sonst Ampel rot bzw. Band stopp.
+
+**Bewegung:** Tasks laufen mit dem geskripteten Referenz-Controller (`app/cnc_expert.py`), nicht mit Dream-1. Er plant
+jede Episode neu: IK über mehrere Greif-Orientierungen, Posen und Wege mit 6 mm Abstand zur Zelle geprüft, Ausführung
+überwacht. Stand: 30/30 bestanden (3 Tasks × Seeds 1000–1009). Dream-1 in den Zellen ist noch nicht angebunden.
+
+Werkzeuge: `tools/cnc_expert_check.py` (Seeds prüfen, `--video`), `tools/cell_demo_video.py` (Demo-Video beider
+Experimente mit Live-Signalen).
+
 ### Evaluation: `POST /evals`
 
 Wie zuverlässig ist ein Skill mit welchem Prompt, welchem Modell und welcher Wiederholungsstrategie, und was kostet ein Erfolg? Dream-1 meldet selbst keinen Erfolg. Diese Antwort liefert nur die Simulation.
