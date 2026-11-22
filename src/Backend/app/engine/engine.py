@@ -148,6 +148,7 @@ class Engine:
         self.blocks = {block.id: block for block in definition.blocks}
         self.edges = {(edge.source, edge.port): edge.target for edge in definition.edges}
         self._dream_run: str | None = None
+        self.handled_errors = 0  # Fehler, die über einen Fehlerpfad weitergeführt wurden
 
     async def run(self) -> None:
         current = next((b for b in self.blocks.values() if b.type == BlockType.START), None)
@@ -187,6 +188,7 @@ class Engine:
             duration_ms=(time.monotonic() - started) * 1000,
         )
         if has_error_path:
+            self.handled_errors += 1
             return Port.ERROR
         raise RunFailed(f"Block '{block.id}': {message}")
 
@@ -227,7 +229,8 @@ class Engine:
             if attempt > 1:
                 await self.control.gate()
             started = time.monotonic()
-            self.sink.credits_used(1)
+            if params.prompt.strip().lower() not in getattr(self.dream, "cell_prompts", frozenset()):
+                self.sink.credits_used(1)  # Zellen-Tasks laufen geskriptet und kosten nichts
             try:
                 run = await asyncio.wait_for(
                     self._run_skill(skill.name, params.prompt, checkpoint, params.sim_timeout_s), timeout

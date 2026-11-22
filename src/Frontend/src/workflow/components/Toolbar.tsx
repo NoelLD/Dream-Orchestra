@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useReactFlow } from '@xyflow/react'
 import { CheckCircle2, Copy, Download, FilePlus, FileUp, FolderOpen, Pause, Play, RotateCcw, Save, StepForward } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
@@ -55,7 +55,12 @@ export function Toolbar() {
   const active = isRunActive(run)
   const nodes = useEditor((s) => s.nodes)
   const edges = useEditor((s) => s.edges)
-  const estimate = useMemo(() => estimateCredits(toDocument('', nodes, edges)), [nodes, edges])
+  const cells = useQuery({ queryKey: ['cells'], queryFn: () => api.listCells(), retry: false, staleTime: 300_000 })
+  const freePrompts = useMemo(
+    () => new Set((cells.data ?? []).flatMap((c) => c.tasks.map((t) => t.prompt.trim().toLowerCase()))),
+    [cells.data],
+  )
+  const estimate = useMemo(() => estimateCredits(toDocument('', nodes, edges), freePrompts), [nodes, edges, freePrompts])
   const estimateText =
     estimate.minPerPass === estimate.maxPerPass ? `${estimate.maxPerPass}` : `${estimate.minPerPass}–${estimate.maxPerPass}`
 

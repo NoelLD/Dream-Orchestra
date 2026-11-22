@@ -147,9 +147,11 @@ class RunRegistry:
         finally:
             self._active.pop(run_id, None)
             repo.finish_run(self.db, run_id, status, error)
+            handled = engine.handled_errors
+            note = f" – Ende über Fehlerpfad ({handled} Fehler behandelt)" if status == "succeeded" and handled else ""
             repo.add_log(
                 self.db,
                 run_id,
-                f"Lauf beendet: {status}" + (f" – {error}" if error else ""),
-                level={"succeeded": "info", "stopped": "warning"}.get(status, "error"),
+                f"Lauf beendet: {status}" + (f" – {error}" if error else "") + note,
+                level="warning" if note else {"succeeded": "info", "stopped": "warning"}.get(status, "error"),
             )

@@ -25,3 +25,13 @@ describe('Credit-Schätzung vor dem Start (F15)', () => {
     expect(estimateCredits(SAMPLE_WORKFLOW)).toEqual({ minPerPass: 1, maxPerPass: 2, hasLoop: true })
   })
 })
+
+describe('Zellen-Tasks', () => {
+  it('kosten keine Credits', async () => {
+    const { CNC_WORKFLOW } = await import('./sample')
+    const { MOCK_CELLS } = await import('@/api/cellsMock')
+    const free = new Set(MOCK_CELLS.flatMap((c) => c.tasks.map((t) => t.prompt.toLowerCase())))
+    expect(estimateCredits(CNC_WORKFLOW).maxPerPass).toBe(2)
+    expect(estimateCredits(CNC_WORKFLOW, free).maxPerPass).toBe(0)
+  })
+})

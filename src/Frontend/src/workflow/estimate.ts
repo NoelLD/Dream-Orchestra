@@ -6,7 +6,8 @@ import type { WorkflowDocument } from '@/api/contract'
  */
 export type CreditEstimate = { minPerPass: number; maxPerPass: number; hasLoop: boolean }
 
-export function estimateCredits(doc: WorkflowDocument): CreditEstimate {
+/** freePrompts: Prompts von Zellen-Tasks (klein geschrieben); sie laufen geskriptet und kosten nichts. */
+export function estimateCredits(doc: WorkflowDocument, freePrompts: ReadonlySet<string> = new Set()): CreditEstimate {
   const start = doc.nodes.find((n) => n.type === 'start')
   if (!start) return { minPerPass: 0, maxPerPass: 0, hasLoop: false }
 
@@ -27,7 +28,7 @@ export function estimateCredits(doc: WorkflowDocument): CreditEstimate {
   let minPerPass = 0
   let maxPerPass = 0
   for (const node of doc.nodes) {
-    if (node.type === 'prompt' && state.has(node.id)) {
+    if (node.type === 'prompt' && state.has(node.id) && !freePrompts.has(node.data.prompt.trim().toLowerCase())) {
       minPerPass += 1
       maxPerPass += 1 + node.data.retries
     }

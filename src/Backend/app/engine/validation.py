@@ -77,7 +77,9 @@ def validate(
     for block_id in sorted(blocks.keys() - seen):
         error("Loser Block: vom Start aus nicht erreichbar", block_id)
 
-    return ValidationResult(valid=not errors, errors=errors, credits_estimate=estimate_credits(definition))
+    return ValidationResult(
+        valid=not errors, errors=errors, credits_estimate=estimate_credits(definition, skill_free_prompts)
+    )
 
 
 def _check_params(
@@ -116,10 +118,12 @@ def _check_params(
             error(f"Gerät '{parsed.device}' ist kein {expected.value}", block_id)
 
 
-def estimate_credits(definition: WorkflowDefinition) -> int:
+def estimate_credits(definition: WorkflowDefinition, free_prompts: frozenset[str] = frozenset()) -> int:
+    """Prompt-Blöcke × (1 + Wiederholungen); Zellen-Tasks (geskriptet) kosten nichts."""
     total = 0
     for block in definition.blocks:
-        if block.type == BlockType.PROMPT:
+        prompt = str(block.params.get("prompt", "")).strip().lower()
+        if block.type == BlockType.PROMPT and prompt not in free_prompts:
             retries = block.params.get("retries", 0)
             total += 1 + (retries if isinstance(retries, int) and retries >= 0 else 0)
     return total

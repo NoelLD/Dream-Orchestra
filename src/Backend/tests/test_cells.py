@@ -5,7 +5,7 @@ import json
 import httpx
 import pytest
 
-from app.devices.adapter import DeviceRegistry
+from app.devices.adapter import DeviceRegistry, VirtualAdapter
 from app.dream.cells import CELL_DEVICES, CellBridge, CellDreamClient, cell_task_for
 from app.dream.client import DreamError, DreamRun
 from app.dream.simulation import SimulationApi
@@ -311,3 +311,36 @@ async def test_cell_prompts_need_no_skill_in_sim_mode() -> None:
     assert not validate(
         other, devices={}, skill_ids=set(), require_skill=True, skill_free_prompts=dream.cell_prompts
     ).valid
+
+
+@pytest.mark.asyncio
+async def test_cell_tasks_cost_no_credits_and_error_path_is_reported() -> None:
+    from app.engine.engine import Engine, EngineSettings
+    from app.engine.validation import validate
+    from tests.test_engine import ListSink, wf
+
+    dream = client(FakeCells(polls_per_task=1))
+    await dream.prime()
+    definition = wf(
+        [
+            ("s", "start", {}),
+            ("u", "prompt", {"prompt": "put the finished part in the green box"}),
+            ("ok", "end", {}),
+            ("err", "end", {}),
+        ],
+        [("s", "u", "next"), ("u", "ok", "next"), ("u", "err", "error")],
+    )
+    assert (
+        validate(definition, devices={}, skill_ids=set(), skill_free_prompts=dream.cell_prompts).credits_estimate == 0
+    )
+    sink = ListSink()
+    engine = Engine(
+        definition,
+        dream=dream,
+        devices=VirtualAdapter(),
+        skills={},
+        sink=sink,
+        settings=EngineSettings(poll_interval_s=0.01),
+    )
+    await engine.run()
+    assert sink.blocks[-1] == "err" and engine.handled_errors == 1 and sink.credits == 0
