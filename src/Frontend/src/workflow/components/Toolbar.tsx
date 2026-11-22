@@ -186,7 +186,7 @@ export function Toolbar() {
           const sample = SAMPLES.find((s) => s.id === id)
           if (sample && confirmDiscard()) {
             load(sample.doc)
-            requestAnimationFrame(() => void fitView({ padding: 24, maxZoom: 1.1 }))
+            requestAnimationFrame(() => void fitView({ padding: '24px', maxZoom: 1.1 }))
           }
         }}
       >

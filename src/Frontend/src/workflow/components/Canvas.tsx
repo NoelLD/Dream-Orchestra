@@ -78,7 +78,7 @@ export function Canvas() {
         deleteKeyCode={['Delete', 'Backspace']}
         forceColorMode="light"
         fitView
-        fitViewOptions={{ padding: 24, maxZoom: 1.1 }}
+        fitViewOptions={{ padding: '24px', maxZoom: 1.1 }}
         minZoom={0.3}
         aria-label="Workflow-Editor"
       >

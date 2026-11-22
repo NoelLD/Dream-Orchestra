@@ -294,7 +294,7 @@ def test_checkpoint_policy_from_measurements(client: TestClient, settings: Setti
     (tmp_path / "snap" / "raw" / "fruit-forget.json").write_text(json.dumps(fruit))
     rows = {r["skill"]: r for r in client.get("/api/results/policy").json()["rows"]}
     cnc = rows["cnc_load"]
-    assert cnc["controller"]["name"].startswith("Referenz") and cnc["controller"]["k"] == 10
+    assert cnc["controller"]["name"].startswith("Scripted") and cnc["controller"]["k"] == 10
     assert cnc["checkpoint"]["label"] == "ft-main" and cnc["checkpoint"]["k"] == 7
     assert [(r["label"], r["k"]) for r in cnc["rejected"]] == [("ft-lr3-main", 1)]
     banana = rows["pick-banana"]

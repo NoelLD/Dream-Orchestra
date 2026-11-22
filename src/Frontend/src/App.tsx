@@ -30,12 +30,12 @@ function WorkflowEditor({ pollError }: { pollError: Error | null }) {
             <PropertiesPanel />
           </div>
         </div>
-        <div className="grid min-h-0 grid-cols-[1fr_auto_400px] border-t bg-white">
-          <div className="min-h-0 min-w-0">
+        <div className="flex min-h-0 border-t bg-white">
+          <div className="min-h-0 min-w-0 flex-1">
             <RunLog pollError={pollError} />
           </div>
           <CellLive />
-          <div className="min-h-0 border-l">
+          <div className="min-h-0 w-[400px] shrink-0 border-l">
             <DeviceBar />
           </div>
         </div>

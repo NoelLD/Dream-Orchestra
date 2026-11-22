@@ -26,13 +26,13 @@ MAIN_RECIPE = "ft-main"  # vorab festgelegtes Hauptrezept: c500, 160 Zellen-Vorf
 REFERENCE = "expert"  # geskripteter Referenz-Controller, führt Zellen-Tasks im Workflow aus
 # Varianten des Hauptrezepts: warum sie nicht freigegeben werden (Gesamtzahlen werden ergänzt)
 VARIANT_RULES: dict[str, str] = {
-    "ft-rep-main": "Replikat desselben Rezepts, misst nur das Trainingsrauschen",
-    "ft-lr3-main": "Abstand zum Hauptrezept nicht größer als zwischen zwei gleichen Trainings (Regel vorab)",
-    "ft-b05-main": "schlechter als das Hauptrezept (Abstand größer als das Trainingsrauschen)",
-    "ft-c1000-main": "nicht besser als c500 bei doppelten Trainingskosten",
-    "ft-rep-g15": "explorativ, nicht vorab festgelegt",
+    "ft-rep-main": "same recipe trained again, only to measure noise",
+    "ft-lr3-main": "not clearly better than c500",
+    "ft-b05-main": "worse than c500",
+    "ft-c1000-main": "no better than c500, twice the cost",
+    "ft-rep-g15": "side experiment",
 }
-OUTSIDE_SKILL = {"skill": "pick-banana", "name": "Banane greifen (außerhalb der Zellen)"}
+OUTSIDE_SKILL = {"skill": "pick-banana", "name": "Pick banana (outside the cells)"}
 
 
 def _first_file(*paths: Path) -> Path | None:
@@ -83,7 +83,7 @@ def _cell_rows(data: dict[str, Any]) -> list[dict[str, Any]]:
                 "name": m["name"],
                 "k": k(m),
                 "total": m["k"],
-                "reason": f"{reason} (gesamt {m['k']}/{n_total}, Hauptrezept {main['k'] if main else '–'}/{n_total})",
+                "reason": reason,
             }
             for label, reason in VARIANT_RULES.items()
             if (m := models.get(label))
@@ -100,15 +100,15 @@ def _cell_rows(data: dict[str, Any]) -> list[dict[str, Any]]:
                         "label": main["label"],
                         "name": main["name"],
                         "k": k(main),
-                        "note": "freigegeben nur für diesen Roboter in den Zellen (nicht Standard für andere Skills)",
+                        "note": "only inside the cells",
                     }
                     if main
                     else None
                 ),
                 "controller": {
-                    "name": "Referenz-Controller (geskriptet)",
+                    "name": "Scripted controller",
                     "k": k(ref),
-                    "reason": "gelernter Checkpoint im Workflow noch nicht angebunden; Referenz gemessen zuverlässiger",
+                    "reason": "more reliable than any fine-tune",
                 },
                 "rejected": rejected,
             }
@@ -138,13 +138,12 @@ def _outside_row(settings: Settings) -> dict[str, Any] | None:
         rejected.append(
             {
                 "label": label,
-                "name": f"Zellen-Fine-Tune {label}",
+                "name": f"Cell fine-tune {label}",
                 "k": v["successes"],
                 "total": v["successes"],
                 "reason": (
-                    f"Vergessen: {base['successes']}/{base['n']} → {v['successes']}/{v['n']} "
-                    f"({vs['lost']} : {vs['gained']} gepaart, p = {p:.3f})"
-                    + (", Regel „schadet“ erfüllt" if harms else "")
+                    f"forgets this skill: {base['successes']}/{base['n']} → {v['successes']}/{v['n']}"
+                    + (f" (p = {p:.3f})" if harms else "")
                 ),
             }
         )
@@ -152,17 +151,17 @@ def _outside_row(settings: Settings) -> dict[str, Any] | None:
         **OUTSIDE_SKILL,
         "scope": "outside",
         "n": base["n"],
-        "base": {"label": "beta", "name": "Dream-1 beta (Basis)", "k": base["successes"]},
+        "base": {"label": "beta", "name": "Dream-1 beta (base)", "k": base["successes"]},
         "checkpoint": {
             "label": "beta",
-            "name": "Dream-1 beta (Basis)",
+            "name": "Dream-1 beta (base)",
             "k": base["successes"],
-            "note": "Standard des Roboters",
+            "note": "robot default",
         },
         "controller": {
-            "name": "Dream-1 beta (Basis)",
+            "name": "Dream-1 beta (base)",
             "k": base["successes"],
-            "reason": "Zellen-Fine-Tunes ausgeschlossen",
+            "reason": "cell fine-tunes excluded",
         },
         "rejected": rejected,
     }

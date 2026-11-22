@@ -78,62 +78,61 @@ function SceneGrid({ data }: { data: CellResults }) {
 
 const score = (k: number | null | undefined, n: number) => (k == null ? '–' : `${k}/${n}`)
 
-/** Wie die Messung das Verhalten steuert: je Aufgabe Ausführung, zulässiger Checkpoint, abgelehnte mit Grund */
-export function PolicyTable({ policy }: { policy: CheckpointPolicy }) {
+/** Wie die Messung das Verhalten steuert: je Aufgabe, wer ausführt und welcher Fine-Tune freigegeben ist */
+export function PolicyTable({ policy, fts }: { policy: CheckpointPolicy; fts: ResultModel[] }) {
+  const cellRow = policy.rows.find((r) => r.scope === 'cell')
   return (
     <section>
-      <h3 className="mb-1 font-semibold">Entscheidung: welcher Checkpoint darf wohin?</h3>
+      <h3 className="mb-1 font-semibold">Which model runs which task?</h3>
       <p className="mb-3 max-w-[80ch] text-sm text-slate-600">
-        Abgeleitet aus den Messungen unten. Freigegeben wird nach dem Gesamtergebnis auf 40 Szenen; je Aufgabe sind es nur 10
-        Szenen, zu wenig für eine eigene Entscheidung. Der Zellen-Fine-Tune gilt nur für diesen Roboter in den Zellen, nicht als
-        Standard für andere Skills. Grund steht beim Darüberfahren.
+        We trained several fine-tunes and tested each on the same scenes. Only the best one is approved, and only inside the
+        cells, because it makes the robot forget other skills.
       </p>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Aufgabe</TableHead>
-            <TableHead>führt im Workflow aus</TableHead>
-            <TableHead>zulässiger Checkpoint</TableHead>
-            <TableHead className="text-right">Basis</TableHead>
-            <TableHead>abgelehnt</TableHead>
+            <TableHead>Task</TableHead>
+            <TableHead>Runs today</TableHead>
+            <TableHead className="text-right">Base model</TableHead>
+            <TableHead>Approved fine-tune</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {policy.rows.map((r) => (
-            <TableRow key={r.skill} className={cn(r.scope === 'outside' && 'bg-amber-50')}>
-              <TableCell>
-                <div className="font-medium">{r.name}</div>
-                <div className="text-xs text-slate-600">{r.scope === 'cell' ? 'Zelle' : 'außerhalb der Zellen'}</div>
-              </TableCell>
-              <TableCell title={r.controller.reason}>
-                <Badge variant="secondary">{r.controller.name}</Badge>{' '}
-                <span className="tabular-nums">{score(r.controller.k, r.n)}</span>
-              </TableCell>
-              <TableCell title={r.checkpoint?.note} className="whitespace-normal">
-                {r.checkpoint ? (
-                  <>
-                    {r.checkpoint.name} <span className="tabular-nums">{score(r.checkpoint.k, r.n)}</span>
-                    {r.scope === 'outside' && <div className="text-xs text-slate-600">{r.checkpoint.note}</div>}
-                  </>
-                ) : (
-                  '–'
-                )}
-              </TableCell>
-              <TableCell className="text-right tabular-nums">{score(r.base?.k, r.n)}</TableCell>
-              <TableCell className="min-w-[320px] whitespace-normal">
-                <ul className="space-y-0.5 text-xs">
-                  {r.rejected.map((x) => (
-                    <li key={x.label} title={x.reason} className={cn(r.scope === 'outside' && 'font-medium text-red-700')}>
-                      {x.name} <span className="tabular-nums">{score(x.k, r.n)}</span>
-                      {r.scope === 'outside' && <> – {x.reason}</>}
-                    </li>
-                  ))}
-                </ul>
-              </TableCell>
-            </TableRow>
-          ))}
+          {policy.rows.map((r) => {
+            const outside = r.scope === 'outside'
+            return (
+              <TableRow key={r.skill} className={cn(outside && 'bg-amber-50')}>
+                <TableCell className="font-medium">{r.name}</TableCell>
+                <TableCell title={r.controller.reason}>
+                  {r.controller.name} <span className="tabular-nums">{score(r.controller.k, r.n)}</span>
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{score(r.base?.k, r.n)}</TableCell>
+                <TableCell className="whitespace-normal">
+                  {outside ? (
+                    <span className="text-red-700">none – the cell fine-tune {r.rejected[0]?.reason ?? 'is excluded'}</span>
+                  ) : (
+                    <>
+                      {r.checkpoint?.name ?? '–'} <span className="tabular-nums">{score(r.checkpoint?.k, r.n)}</span>
+                    </>
+                  )}
+                </TableCell>
+              </TableRow>
+            )
+          })}
         </TableBody>
       </Table>
+      {cellRow && cellRow.rejected.length > 0 && (
+        <div className="mt-3 text-sm">
+          <h4 className="mb-1 font-medium">Other fine-tunes, not approved (score on all 40 scenes; approved c500: {fts.find((m) => m.label === 'ft-main')?.k ?? '–'}/40)</h4>
+          <ul className="space-y-0.5 text-slate-700">
+            {cellRow.rejected.map((x) => (
+              <li key={x.label}>
+                {x.name}: <span className="tabular-nums">{x.total}/40</span> – {x.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   )
 }
@@ -180,8 +179,8 @@ export function ResultsView() {
         </p>
       </section>
 
-      {policy.data && <PolicyTable policy={policy.data} />}
-      {policy.isError && <p className="text-sm text-red-700">Freigabe nicht abrufbar: {policy.error.message}</p>}
+      {policy.data && <PolicyTable policy={policy.data} fts={data.models} />}
+      {policy.isError && <p className="text-sm text-red-700">Decision table unavailable: {policy.error.message}</p>}
 
       <section>
         <h3 className="mb-2 font-semibold">Erfolg auf {n} Szenen</h3>
