@@ -28,8 +28,16 @@ ROBOTS: dict[str, Robot] = {
 DEFAULT_ROBOT = "yam-sim"
 
 
-def active_checkpoint(robot: str, jobs: dict[str, dict]) -> str | None:
-    """The newest finished fine-tune of this robot type, or None (then the base model is used)."""
-    done = [j for j in jobs.values() if j.get("robot", DEFAULT_ROBOT) == robot and j.get("fine_tuned_model")]
+CELL_DATASET_PREFIX = "cells"  # datasets of the CNC/conveyor cells: their fine-tunes are cell-scoped
+
+
+def active_checkpoint(robot: str, jobs: dict[str, dict], *, cells: bool = False) -> str | None:
+    """The newest finished fine-tune of this robot type for general skills (cells=False) or for the cell tasks
+    (cells=True), or None (then the base model is used).
+
+    Measured 22.11.: the cell fine-tunes forget the banana (6/20 -> 0/20, 6:0 paired, pre-registered "harms" rule met),
+    so a fine-tune trained only on cell data never becomes the default for the robot's other skills."""
+    done = [j for j in jobs.values() if j.get("robot", DEFAULT_ROBOT) == robot and j.get("fine_tuned_model")
+            and str(j.get("dataset", "")).startswith(CELL_DATASET_PREFIX) == cells]
     done.sort(key=lambda j: j.get("finished_at") or j.get("created_at") or "")
     return done[-1]["fine_tuned_model"] if done else None

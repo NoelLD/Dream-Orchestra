@@ -264,6 +264,8 @@ export const DeviceSchema = z.object({
   /** false: Wert gilt gerade nicht (z. B. Zelle getrennt) – dann Grund statt Wert anzeigen */
   available: z.boolean().optional(),
   unavailable_reason: z.string().nullable().optional(),
+  /** true: Wert meldet eine Quelle (z. B. die Zelle) – anzeigen, nicht bedienen */
+  read_only: z.boolean().optional(),
 })
 export type Device = z.infer<typeof DeviceSchema>
 

@@ -25,7 +25,7 @@ Diese Datei fasst es zusammen und beschreibt, wie das Frontend es nutzt.
 | GET | `/api/runs` | letzte Läufe | – |
 | GET | `/api/runs/{id}?after=<cursor>` | Status, `active_block_id`, `credits_used`, `log` (ab Cursor), `cursor` | `getRun()` (Polling, ganzes Protokoll) |
 | POST | `/api/runs/{id}/stop` \| `pause` \| `resume` \| `step` | Steuerung (F7, F8) | `stopRun()`, `pauseRun()`, `resumeRun()`, `stepRun()` |
-| GET | `/api/devices` | Geräte mit `protocol`, `config` (ohne Passwort, dafür `password_set`), `simulated`, Wert; `unit`, `min`, `max` bei Zahlenwerten | `listDevices()` |
+| GET | `/api/devices` | Geräte mit `protocol`, `config` (ohne Passwort, dafür `password_set`), `simulated`, Wert; `unit`, `min`, `max` bei Zahlenwerten; `available`/`unavailable_reason` (Wert gilt gerade nicht, z. B. Zelle getrennt); `read_only` (Wert meldet die Zelle, `PUT …/value` → 409) | `listDevices()` |
 | POST | `/api/devices` | `{name, type, config, unit?, min?, max?}` → `201`; ID wird aus dem Namen gebildet | `createDevice()` → Ansicht „Geräte“ |
 | PUT | `/api/devices/{id}` | wie POST; leeres Passwort = unverändert; `409` bei Wechsel Sensor↔Aktor, solange ein gespeicherter Workflow das Gerät nutzt | `updateDevice()` |
 | DELETE | `/api/devices/{id}` | `204`; `409` mit `details: [{id, name}]` der Workflows, die das Gerät nutzen | `deleteDevice()` |

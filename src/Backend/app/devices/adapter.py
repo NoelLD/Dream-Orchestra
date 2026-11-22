@@ -117,6 +117,8 @@ class DeviceRegistry(VirtualAdapter):
         self.guards: list[Callable[[str], str | None]] = []
         # Quittung: wird nach dem Schalten eines Aktors im Ablauf abgewartet (z. B. Zellen-Aktion)
         self.apply_hooks: list[Callable[[Device], Awaitable[None]]] = []
+        # Geräte, deren Werte eine Quelle meldet (z. B. die Zelle): Gerät-ID -> Quelle; nicht von Hand setzbar
+        self.owned: dict[str, str] = {}
 
     def unavailable_reason(self, device_id: str) -> str | None:
         """Warum der Wert gerade nicht gilt (Zelle getrennt, Wert zu alt), sonst None."""
@@ -228,4 +230,6 @@ def set_by_user(adapter: DeviceAdapter, device_id: str, value: bool | float) -> 
     """F10: Der Nutzer bedient Sensoren; Aktoren schaltet nur der Ablauf."""
     if adapter.get(device_id).kind is DeviceKind.ACTUATOR:
         raise ConflictError(f"'{device_id}' ist ein Aktor und wird vom Ablauf geschaltet")
+    if (source := getattr(adapter, "owned", {}).get(device_id)) is not None:
+        raise ConflictError(f"'{device_id}' meldet {source}; der Wert lässt sich nicht von Hand setzen")
     return adapter.set(device_id, value)

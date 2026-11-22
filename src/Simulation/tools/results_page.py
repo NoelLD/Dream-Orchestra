@@ -26,7 +26,7 @@ DEFAULT_CELLS = SIM / "data/evals/cells"
 CELLS = Path(os.environ["CELLS_DIR"]).resolve() if os.environ.get("CELLS_DIR") else DEFAULT_CELLS
 SNAPSHOT = REPO / "docs/results"
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else SIM.parents[2] / "results_overview.html"
-FONTS = Path.home() / "claude-projects/products/marty-skills/skills/public/martin-uix/assets/fonts"
+FONTS = Path(os.environ.get("FONTS_DIR") or Path.home() / "claude-projects/products/marty-skills/skills/public/martin-uix/assets/fonts")
 TASKS = ["sort_round", "sort_cube", "cnc_load", "cnc_unload"]
 TASK_NAMES = {"sort_round": "Sort round part", "sort_cube": "Sort cube", "cnc_load": "Load CNC",
               "cnc_unload": "Unload CNC"}
@@ -204,7 +204,9 @@ def app_shot(name: str) -> str:
 
 
 def font(name: str) -> str:
-    return base64.b64encode((FONTS / name).read_bytes()).decode()
+    """Embedded web font, or "" (the page then falls back to system fonts, e.g. on a fresh clone)."""
+    path = FONTS / name
+    return base64.b64encode(path.read_bytes()).decode() if path.is_file() else ""
 
 
 def main() -> int:

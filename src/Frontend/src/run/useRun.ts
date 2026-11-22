@@ -29,6 +29,11 @@ export function useRunPolling() {
     if (query.data) setRun(query.data)
   }, [query.data, setRun])
 
+  // Gemerkte ID aus einer früheren Sitzung, die das Backend nicht mehr kennt: verwerfen statt hängen zu bleiben
+  useEffect(() => {
+    if (query.isError && !query.data) setRun(null)
+  }, [query.isError, query.data, setRun])
+
   return query
 }
 

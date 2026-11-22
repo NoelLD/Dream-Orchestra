@@ -183,11 +183,22 @@ class CellDreamClient:
             session, note = await self._ensure_session(cell), REFILL_NOTE
         marker = _marker(session)
         deadline = time.monotonic() + SESSION_START_S
+        maybe_sent = False  # eine Antwort ging verloren: der Dienst hat den Task vielleicht schon angenommen
         while True:
+            if maybe_sent:
+                accepted = await self._accepted(task, marker)
+                if accepted:
+                    break  # nicht ein zweites Mal schicken (Codex: doppelte Ausführung)
+                if accepted is None:  # unklar (Dienst antwortet nicht): warten statt erneut schicken
+                    if time.monotonic() > deadline:
+                        raise DreamError(f"Zellen-Task {task}: Annahme nicht bestätigt, Dienst antwortet nicht")
+                    await asyncio.sleep(self.poll_s)
+                    continue
             try:
                 await self.api.request("POST", "/cells/session/task", {"task": task})
                 break
             except UpstreamError as exc:
+                maybe_sent = maybe_sent or exc.code == "simulation_unavailable"
                 if exc.code in BUSY_CODES and time.monotonic() < deadline:
                     await asyncio.sleep(self.poll_s)
                     continue
@@ -197,6 +208,22 @@ class CellDreamClient:
         if note:
             self._notes[run_id] = note
         return run_id
+
+    async def _accepted(self, task: str, marker: tuple[float, str] | None) -> bool | None:
+        """Codex: ein wiederholtes Absenden darf einen Task nicht doppelt ausführen. Angenommen heißt: die Zelle ist
+        mit diesem Task beschäftigt oder hat ihn nach dem Marker gestartet, gesperrt oder geprüft. None = unklar."""
+        try:
+            session = await self._session()
+        except DreamError:
+            return None  # Dienst antwortet nicht: unklar, später erneut prüfen
+        if session is None:
+            return False
+        if session.get("busy") == task:
+            return True
+        return any(
+            task in e.get("text", "") or (e.get("result") or {}).get("task") == task
+            for e in _after(session.get("events") or [], marker)
+        )
 
     async def status(self, run_id: str) -> DreamRun:
         if run_id not in self._runs:

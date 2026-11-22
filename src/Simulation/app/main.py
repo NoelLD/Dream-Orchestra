@@ -149,6 +149,7 @@ def robot_public(robot) -> dict:
     return {"name": robot.name, "description": robot.description, "embodiment": robot.embodiment,
             "cameras": list(robot.cameras), "skills": [s.name for s in SKILLS.values() if s.robot == robot.name],
             "fine_tuned_model": active_checkpoint(robot.name, training.jobs),
+            "cell_fine_tuned_model": active_checkpoint(robot.name, training.jobs, cells=True),
             "finetune_jobs": [{k: j.get(k) for k in ("job_id", "status", "dataset", "suffix", "steps", "price_usd",
                                                      "fine_tuned_model", "created_at")} for j in jobs]}
 

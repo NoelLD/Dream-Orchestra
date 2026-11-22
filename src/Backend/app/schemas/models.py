@@ -90,6 +90,9 @@ class DeviceOut(BaseModel):
     simulated: bool = Field(default=True, description="Werte werden simuliert (noch keine echte Verbindung)")
     available: bool = Field(default=True, description="False: Wert gilt gerade nicht (z. B. Zelle getrennt)")
     unavailable_reason: str | None = Field(default=None, description="Grund, wenn available False ist")
+    read_only: bool = Field(
+        default=False, description="Wert meldet eine Quelle (z. B. die Zelle), nicht von Hand setzbar"
+    )
 
 
 class DeviceValue(BaseModel):

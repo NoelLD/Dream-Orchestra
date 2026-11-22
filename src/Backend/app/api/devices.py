@@ -8,7 +8,7 @@ from app.schemas.models import DeviceOut, DeviceValue
 router = APIRouter(prefix="/devices", tags=["Geräte"])
 
 
-def _out(device: Device, unavailable: str | None = None) -> DeviceOut:
+def _out(device: Device, unavailable: str | None = None, read_only: bool = False) -> DeviceOut:
     """Gerät mit Verfügbarkeit: ein Wert, der gerade nicht gilt, wird als solcher gemeldet (nicht als alter Wert)."""
     return DeviceOut(
         id=device.id,
@@ -25,12 +25,13 @@ def _out(device: Device, unavailable: str | None = None) -> DeviceOut:
         simulated=True,
         available=unavailable is None,
         unavailable_reason=unavailable,
+        read_only=read_only,
     )
 
 
 def _out_live(services: Services, device: Device) -> DeviceOut:
     reason = getattr(services.devices, "unavailable_reason", lambda _: None)(device.id)
-    return _out(device, reason)
+    return _out(device, reason, device.id in getattr(services.devices, "owned", {}))
 
 
 @router.get("", response_model=list[DeviceOut], summary="Geräte mit aktuellem (simuliertem) Wert")

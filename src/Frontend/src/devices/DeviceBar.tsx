@@ -157,6 +157,10 @@ export function DeviceBar() {
                   <DeviceName device={d} htmlFor={`device-${d.id}`} />
                   {d.available === false ? (
                     <Unavailable device={d} />
+                  ) : d.read_only ? (
+                    <span className="text-xs font-medium" data-testid={`device-readonly-${d.id}`} title="meldet die Zelle">
+                      {d.value === true ? 'an' : d.value === false ? 'aus' : String(d.value)}
+                    </span>
                   ) : (
                     <SensorControl device={d} onSet={(value) => setDevice.mutate({ id: d.id, value })} />
                   )}

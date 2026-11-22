@@ -71,6 +71,7 @@ def create_app(settings: Settings | None = None, factory: Callable[[Settings], S
             services.devices.ensure(d for d, _ in CELL_DEVICES.values())
             bridge = CellBridge(services.simulation, services.devices)
             services.devices.guards.append(bridge.unavailable)
+            services.devices.owned.update(dict.fromkeys(CELL_DEVICES, "die Zelle"))
             services.devices.apply_hooks.append(bridge.apply)
             bridge.start()
             if isinstance(services.dream, CellDreamClient):

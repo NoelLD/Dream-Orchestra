@@ -50,3 +50,14 @@ describe('Editor-Store: mehrere Workflows', () => {
     expect(selectIsDirty(state())).toBe(true)
   })
 })
+
+describe('Laufzustand übersteht Neuladen (Codex: STOP nach Refresh)', () => {
+  it('merkt sich die ID eines aktiven Laufs und vergisst sie am Ende', async () => {
+    const { restoredRunId, useRunStore } = await import('./store')
+    const run = { id: '42', status: 'running' } as unknown as Parameters<ReturnType<typeof useRunStore.getState>['setRun']>[0]
+    useRunStore.getState().setRun(run)
+    expect(restoredRunId()).toBe('42')
+    useRunStore.getState().setRun({ ...run!, status: 'stopped' } as typeof run)
+    expect(restoredRunId()).toBeNull()
+  })
+})

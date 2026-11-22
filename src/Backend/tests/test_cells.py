@@ -396,6 +396,10 @@ def test_devices_api_reports_unavailable_cell_sensor(tmp_path: pathlib.Path) -> 
     settings = Settings(dream_api_mode="sim", database_path=tmp_path / "d.sqlite3", simulation_url="http://127.0.0.1:9")
     with TestClient(create_app(settings)) as client:
         devices = {d["id"]: d for d in client.get("/api/devices").json()}
+        # Codex: Zellen-Sensoren meldet die Zelle; Handeingabe darf kein „Maschine fertig“ vortäuschen
+        assert client.put("/api/devices/zelle-maschine-fertig/value", json={"value": True}).status_code == 409
+        assert client.put("/api/devices/lichtschranke/value", json={"value": True}).status_code == 200
+    assert devices["zelle-maschine-fertig"]["read_only"] is True and devices["lichtschranke"]["read_only"] is False
     sensor = devices["zelle-maschine-fertig"]
     assert sensor["available"] is False and "nicht verfügbar" in sensor["unavailable_reason"]
     assert devices["zelle-ampel-rot"]["available"] is False  # Codex #3: auch Aktoren der Zelle
@@ -546,3 +550,31 @@ async def test_frozen_simulation_goes_stale() -> None:
     bridge._mirror({**frozen, "sim_seconds": 3.5}, next(bridge._seq))
     assert bridge.unavailable("zelle-maschine-fertig") is None
     assert _time.monotonic() - bridge._last_ok < 1
+
+
+@pytest.mark.asyncio
+async def test_lost_task_response_does_not_run_the_task_twice() -> None:
+    """Codex: der Dienst nimmt den Task an, die Antwort geht verloren -> kein zweites Absenden."""
+    fake = FakeCells(polls_per_task=3)
+    posts = {"n": 0, "lost": 0}
+
+    def lossy(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/cells/session/task":
+            posts["n"] += 1
+            response = fake(request)  # der Dienst nimmt an ...
+            if posts["lost"] == 0:
+                posts["lost"] = 1
+                raise httpx.ReadError("lost", request=request)  # ... aber die Antwort kommt nie an
+            return response
+        if request.url.path == "/cells/session" and request.method == "GET" and posts["lost"] == 1:
+            posts["lost"] = 2
+            raise httpx.ReadError("still slow", request=request)  # auch die erste Kontrollabfrage scheitert
+        return fake(request)
+
+    dream = CellDreamClient(
+        NoDream(), SimulationApi("http://sim", transport=httpx.MockTransport(lossy)), allow_scripted=True, poll_s=0.01
+    )
+    await dream.api.request("POST", "/cells/cnc/session")
+    run = await finish(dream, await dream.start(skill="cnc_load", prompt="", checkpoint=None))
+    assert run.success
+    assert posts["n"] == 1  # genau einmal abgeschickt

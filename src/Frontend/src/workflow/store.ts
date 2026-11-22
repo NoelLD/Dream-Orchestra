@@ -1,6 +1,6 @@
 import { addEdge, type Connection, type OnEdgesChange, type OnNodesChange, type XYPosition } from '@xyflow/react'
 import { create } from 'zustand'
-import type { NodeDataOf, Run, WorkflowDocument, WorkflowNodeType } from '@/api/contract'
+import { TERMINAL_RUN_STATUSES, type NodeDataOf, type Run, type WorkflowDocument, type WorkflowNodeType } from '@/api/contract'
 import { BLOCKS } from './blocks'
 import { EDGE_DEFAULTS, fromDocument, toDocument, type FlowEdge, type FlowNode } from './flow'
 import { serializeWorkflow } from './io'
@@ -101,10 +101,33 @@ type RunState = {
   setPollInterval: (ms: number) => void
 }
 
+// Die ID eines aktiven Laufs übersteht ein Neuladen der Seite: Abfrage und STOP finden den Lauf wieder.
+const ACTIVE_RUN_KEY = 'dreamorchestra.activeRunId'
+
+export function restoredRunId(): string | null {
+  try {
+    return localStorage.getItem(ACTIVE_RUN_KEY)
+  } catch {
+    return null
+  }
+}
+
+function rememberRunId(run: Run | null) {
+  try {
+    if (run && !TERMINAL_RUN_STATUSES.includes(run.status)) localStorage.setItem(ACTIVE_RUN_KEY, run.id)
+    else localStorage.removeItem(ACTIVE_RUN_KEY)
+  } catch {
+    // ohne Speicher (privates Fenster): Lauf nur bis zum Neuladen bekannt
+  }
+}
+
 export const useRunStore = create<RunState>()((set) => ({
-  runId: null,
+  runId: restoredRunId(),
   run: null,
   pollIntervalMs: 1000,
-  setRun: (run) => set({ run, runId: run?.id ?? null }),
+  setRun: (run) => {
+    rememberRunId(run)
+    set({ run, runId: run?.id ?? null })
+  },
   setPollInterval: (pollIntervalMs) => set({ pollIntervalMs }),
 }))
