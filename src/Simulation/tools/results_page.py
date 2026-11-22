@@ -452,9 +452,9 @@ footer{margin-top:64px;color:var(--ink-3);font-size:.85rem}
 <div class="theme"><button type="button" id="themeBtn">Dark / light</button></div>
 <main>
 <h1>Dream Orchestrator</h1>
-<p class="lead">Robot automation from reusable Dream-1 skills. You draw the process as a workflow, connect machines
-and sensors, run it in a simulated cell, and only when a robot needs to learn a new cell do you fine-tune it, with the
-result measured before anyone trusts it.</p>
+<p class="lead"><b>Dream Orchestra turns Dream-1 skills into machine workflows and measures whether they actually
+work.</b> You draw the process as a workflow, connect machines and sensors, run it in a simulated cell, and only when
+a robot needs to learn a new cell do you fine-tune it, with the result measured before anyone trusts it.</p>
 <p class="sub">REMix × Dream Labs hackathon, team Dream Orchestra. Everything below runs in MuJoCo simulation. As of {{NOW}}.</p>
 
 <h2 id="idea">How it fits together</h2>
