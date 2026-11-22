@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-22T11:28:57",
+ "generated_at": "2026-11-22T13:18:33",
  "base": "beta-main",
  "tasks": [
   "sort_round",
@@ -1516,6 +1516,247 @@
    "win": 19,
    "loss": 5,
    "p": 0.006610751152038574
+  },
+  {
+   "label": "ft-b05-main",
+   "name": "Fine-tune, 50 % base data",
+   "what": "mix in Dream's own data",
+   "prereg": true,
+   "k": 6,
+   "lo": 0.07061091708507435,
+   "hi": 0.2907262603902003,
+   "contact": 14,
+   "buckets": {
+    "success": 6,
+    "dropped": 5,
+    "not_released": 0,
+    "no_grasp": 6,
+    "action_error": 23
+   },
+   "tasks": {
+    "sort_round": 4,
+    "sort_cube": 0,
+    "cnc_load": 0,
+    "cnc_unload": 2
+   },
+   "scenes": [
+    [
+     "action_error",
+     true,
+     "action_error"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "dropped",
+     false,
+     "timeout_dropped"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "action_error",
+     true,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "dropped",
+     true,
+     "timeout_dropped"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ],
+    [
+     "no_grasp",
+     true,
+     "timeout_no_grasp"
+    ],
+    [
+     "success",
+     true,
+     "success"
+    ],
+    [
+     "action_error",
+     true,
+     "action_error"
+    ],
+    [
+     "success",
+     false,
+     "success"
+    ],
+    [
+     "action_error",
+     false,
+     "action_error"
+    ]
+   ],
+   "times": [
+    22.4,
+    22.4,
+    23.2,
+    23.2,
+    24.6,
+    31.8
+   ],
+   "t_median": 23.2,
+   "within20": 0,
+   "within30": 5,
+   "both": 0,
+   "both_faster": 0,
+   "win": 6,
+   "loss": 6,
+   "p": 1.0
   }
  ],
  "spend": {
@@ -1537,7 +1778,7 @@
    },
    {
     "name": "yam-cells-c1000",
-    "status": "running",
+    "status": "succeeded",
     "usd": 200.0
    },
    {
@@ -1565,22 +1806,23 @@
    "calib-ft-r10": 0.216,
    "calib-ft-r20": 0.37,
    "calib-ft-r30": 0.714,
-   "ft-b05-main": 0.655,
+   "ft-b05-main": 1.4,
    "ft-lr3-main": 1.481,
    "ft-main": 1.8,
+   "ft-rep-g15": 1.417,
    "ft-rep-main": 1.803
   },
   "credit": 1000.0,
   "dev": {
-   "calls": 1195,
+   "calls": 1409,
    "phases": {
     "Idea, research, team name": 12.41,
     "Simulation, cells, scripted expert, API": 80.11,
-    "Fine-tune data, training gates, evaluation, pages, integration": 38.85
+    "Fine-tune data, training gates, evaluation, pages, integration": 62.45
    },
-   "usd": 131.37,
-   "out_m": 1.27,
-   "cache_read_m": 302.4
+   "usd": 154.96,
+   "out_m": 1.49,
+   "cache_read_m": 379.5
   }
  },
  "queue": [
@@ -1600,13 +1842,13 @@
    "label": "ft-b05-main",
    "name": "Fine-tune, 50 % base data",
    "eta": "~12:10",
-   "done": false
+   "done": true
   },
   {
    "label": "fruit-forget",
    "name": "Forgetting check (banana)",
    "eta": "~13:10",
-   "done": false
+   "done": true
   },
   {
    "label": "ft-rep-g15",

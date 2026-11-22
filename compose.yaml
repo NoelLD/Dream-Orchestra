@@ -69,6 +69,7 @@ services:
       - ./src/Backend:/app:ro
       - ./src/Backend/data:/app/data
       - ./src/Simulation/data/evals/cells:/sim-results:ro
+      - ./docs/results:/results-snapshot:ro
     env_file:
       - path: .env
         required: false

@@ -13,7 +13,7 @@
 ![MuJoCo](https://img.shields.io/badge/MuJoCo-two%20simulated%20cells-555)
 ![FastAPI](https://img.shields.io/badge/FastAPI-workflow%20engine%20·%20simulation%20API-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-React%20Flow%20editor-61dafb?logo=react&logoColor=black)
-![Tests](https://img.shields.io/badge/tests-66%20backend%20·%2082%20frontend-2ea44f)
+![Tests](https://img.shields.io/badge/tests-89%20backend%20·%2084%20frontend-2ea44f)
 
 REMix × Dream Labs hackathon, Berlin, 21–22 Nov 2026 · [Results page](https://cell-finetune-results.martinkaiser-bln.workers.dev)
 
@@ -83,6 +83,12 @@ From [`docs/results/report_corrected.md`](docs/results/report_corrected.md), 40 
 claim; per-task results are not stable across trainings. The cell fine-tune forgets outside the cells: banana
 6/20 (base) → 0/20, 6 : 0 paired, which meets the pre-registered "harms" rule, so cell checkpoints stay cell-only. A transfer test on an untrained, similar task is
 pre-registered in [`docs/results/TRANSFER_PREREG.md`](docs/results/TRANSFER_PREREG.md).
+
+**Check the numbers yourself:** every scored scene is committed in [`docs/results/raw/`](docs/results/raw/)
+(one JSON line per scene and attempt). `CELLS_DIR=docs/results/raw python3 src/Simulation/tools/results_page.py
+/tmp/results.html` recomputes the table above (first attempt per scene, paired McNemar) without Docker or network.
+The app's results tab reads the same snapshot ([`docs/results/results.json`](docs/results/results.json)) when no
+local measurements exist.
 
 ## Questions we expect
 

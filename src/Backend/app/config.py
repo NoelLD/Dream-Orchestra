@@ -28,6 +28,8 @@ class Settings(BaseSettings):
 
     # Zusammenfassung der Zellen-Fine-Tunes (src/Simulation/tools/results_page.py), schreibgeschützt eingebunden
     cell_results_path: Path = Path("/sim-results/results.json")
+    # Eingecheckter Snapshot (docs/results), falls lokal keine Messdaten liegen (frischer Klon)
+    cell_results_snapshot_path: Path = Path("/results-snapshot/results.json")
 
     database_path: Path = BACKEND_ROOT / "data" / "dreamorchestra.sqlite3"
     schema_path: Path = BACKEND_ROOT / "models" / "schema.sql"

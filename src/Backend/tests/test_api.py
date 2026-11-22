@@ -253,6 +253,9 @@ def test_cells_proxy_reports_unreachable_simulation(client: TestClient) -> None:
 
 def test_cell_results_read_from_file(client: TestClient, settings: Settings, tmp_path: Path) -> None:
     settings.cell_results_path = tmp_path / "results.json"
+    settings.cell_results_snapshot_path = tmp_path / "snapshot.json"
     assert client.get("/api/results/cells").status_code == 404
+    settings.cell_results_snapshot_path.write_text('{"base": "snapshot", "models": []}')
+    assert client.get("/api/results/cells").json()["base"] == "snapshot"  # frischer Klon: Snapshot
     settings.cell_results_path.write_text('{"base": "beta-main", "models": []}')
     assert client.get("/api/results/cells").json() == {"base": "beta-main", "models": []}

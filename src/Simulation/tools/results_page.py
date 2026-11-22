@@ -12,13 +12,19 @@ import base64
 import html
 import json
 import math
+import os
 import re
+import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
 
 SIM = Path(__file__).resolve().parents[1]
-CELLS = SIM / "data/evals/cells"
+REPO = SIM.parents[1]
+DEFAULT_CELLS = SIM / "data/evals/cells"
+# CELLS_DIR=docs/results/raw recomputes the numbers from the committed per-scene records (fresh clone)
+CELLS = Path(os.environ["CELLS_DIR"]).resolve() if os.environ.get("CELLS_DIR") else DEFAULT_CELLS
+SNAPSHOT = REPO / "docs/results"
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else SIM.parents[2] / "results_overview.html"
 FONTS = Path.home() / "claude-projects/products/marty-skills/skills/public/martin-uix/assets/fonts"
 TASKS = ["sort_round", "sort_cube", "cnc_load", "cnc_unload"]
@@ -236,7 +242,8 @@ def main() -> int:
             m |= {"win": win, "loss": loss, "p": mcnemar(win, loss)}
         models.append(m)
 
-    log = (CELLS / "amendment.log").read_text().splitlines()
+    log_file = CELLS / "amendment.log"
+    log = log_file.read_text().splitlines() if log_file.exists() else []
     final = [x for x in log if "[final]" in x][-6:]
     fruit = CELLS / "fruit-forget.json"
     now = datetime.now().strftime("%H:%M")
@@ -248,6 +255,13 @@ def main() -> int:
                          for lab, eta in QUEUE],
                "public_url": "https://cell-finetune-results.martinkaiser-bln.workers.dev"}  # same Worker, reframed as Orchestrator page
     (CELLS / "results.json").write_text(json.dumps(summary, indent=1))
+    if CELLS == DEFAULT_CELLS:  # committed snapshot for judges: summary + scored per-scene records
+        raw = SNAPSHOT / "raw"
+        raw.mkdir(parents=True, exist_ok=True)
+        (SNAPSHOT / "results.json").write_text(json.dumps(summary, indent=1))
+        for f in [*CELLS.glob("*.jsonl"), CELLS / "fruit-forget.json"]:
+            if f.exists() and not f.name.startswith("calib-"):
+                shutil.copy2(f, raw / f.name)
     payload = json.dumps({"spend": spend, "models": models, "tasks": TASKS, "taskNames": TASK_NAMES}).replace("</", "<\\/")
 
     rows = []
