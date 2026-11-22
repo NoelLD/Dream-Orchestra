@@ -2,6 +2,7 @@
 
     modal run src/Simulation/tools/modal_gen.py --name pick-v1 --count 2    # wave 1: two episodes
     modal run src/Simulation/tools/modal_gen.py --name pick-v1 --count 50   # wave 2: resumes, skips existing
+    modal run src/Simulation/tools/modal_gen.py --script cells --name cells-v1 --count 80 --first-seed 4000
 Run from a host with the modal CLI and the Dream example cloned to Dream-Orchestra/vendor/dreamlabs.
 Result: src/Simulation/data/datasets/<name>/ep-<seed>/ (each a one-episode LeRobot v2.1 session; Dream accepts a folder of sessions).
 Validate afterwards:  docker compose run --rm simulation python /app/tools/validate.py datasets/<name>
@@ -36,18 +37,20 @@ app = modal.App("dream-orchestra-demo-gen", image=image)
 
 
 @app.function(cpu=2, memory=4096, timeout=900, retries=1)
-def record_episode(seed: int, skill: str = "both", small: bool = False) -> dict:
-    """Record one randomized episode and return the session as a tar. skill: banana | apple | both (alternating)."""
+def record_episode(seed: int, skill: str = "both", small: bool = False, script: str = "fruit") -> dict:
+    """Record one randomized episode and return the session as a tar. skill: banana | apple | both (alternating).
+    script="cells": the cell expert (tools/record_cells.py, task by seed % 4, always the 320x180 run-time format)."""
     import subprocess
 
     start = time.time()
     out = Path(f"/tmp/ep-{seed:04d}")
-    proc = subprocess.run(
-        ["python", "tools/record_dataset.py", "--out", str(out), "--episodes", "1", "--seed", str(seed),
-         "--randomize", "--skill-offset", str({"banana": 0, "apple": 1}.get(skill, seed % 2)), "--no-validate"]
-        + (["--small"] if small else []),
-        cwd="/work", capture_output=True, text=True,
-    )
+    if script == "cells":
+        cmd = ["python", "tools/record_cells.py", "--out", str(out), "--seed", str(seed)]
+    else:
+        cmd = (["python", "tools/record_dataset.py", "--out", str(out), "--episodes", "1", "--seed", str(seed),
+                "--randomize", "--skill-offset", str({"banana": 0, "apple": 1}.get(skill, seed % 2)), "--no-validate"]
+               + (["--small"] if small else []))
+    proc = subprocess.run(cmd, cwd="/work", capture_output=True, text=True)
     log = (proc.stdout + proc.stderr)[-2000:]
     if proc.returncode != 0 or not (out / "meta/info.json").exists():
         return {"seed": seed, "ok": False, "log": log, "seconds": time.time() - start}
@@ -61,7 +64,8 @@ def record_episode(seed: int, skill: str = "both", small: bool = False) -> dict:
 
 
 @app.local_entrypoint()
-def main(name: str = "pick-v1", count: int = 2, first_seed: int = 1000, skill: str = "both", small: bool = False):
+def main(name: str = "pick-v1", count: int = 2, first_seed: int = 1000, skill: str = "both", small: bool = False,
+         script: str = "fruit"):
     """Training seeds start at 1000; evaluation uses seeds below 1000, so test scenes are never training scenes."""
     target = DATASETS / name
     target.mkdir(parents=True, exist_ok=True)
@@ -69,7 +73,7 @@ def main(name: str = "pick-v1", count: int = 2, first_seed: int = 1000, skill: s
     print(f"{count - len(seeds)} sessions exist, launching {len(seeds)}")
     runs = target.parent / f"{name}.runs.jsonl"
     ok = 0
-    for result in record_episode.map(seeds, kwargs={"skill": skill, "small": small}, return_exceptions=True):
+    for result in record_episode.map(seeds, kwargs={"skill": skill, "small": small, "script": script}, return_exceptions=True):
         if isinstance(result, Exception):
             print("worker error:", result)
             continue
