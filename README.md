@@ -13,19 +13,22 @@
 ![MuJoCo](https://img.shields.io/badge/MuJoCo-two%20simulated%20cells-555)
 ![FastAPI](https://img.shields.io/badge/FastAPI-workflow%20engine%20·%20simulation%20API-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-React%20Flow%20editor-61dafb?logo=react&logoColor=black)
-![Tests](https://img.shields.io/badge/tests-89%20backend%20·%2084%20frontend-2ea44f)
+![Tests](https://img.shields.io/badge/tests-93%20backend%20·%2086%20frontend-2ea44f)
 
 REMix × Dream Labs hackathon, Berlin, 21–22 Nov 2026 · [Results page](https://cell-finetune-results.martinkaiser-bln.workers.dev)
 
 </div>
 
 > **Try it (local, about 5 minutes, no Dream credits):** `DREAM_API_MODE=sim docker compose up -d --build`, open
-> `http://localhost:8080`. In the workflow editor pick **Beispiel laden → CNC-Zyklus (Zelle)** and press
-> **Lauf starten**; watch it in the **Zellen-Leitstand** tab. Then load **CNC-Zyklus: Fehlerfall**: the unload step
-> fails, the workflow takes its error path and switches the stack light to red. In `sim` mode the arm is moved by
-> the scripted reference controller, not by Dream-1; the log labels every step.
+> `http://localhost:8080`. In the workflow editor pick **Load example → CNC-Zyklus (Zelle)** and press
+> **Start run**; the live image of the cell appears next to the log. Then load **CNC-Zyklus: Fehlerfall**: the unload
+> step fails, the workflow takes its error path and switches the stack light to red. In `sim` mode the arm is moved
+> by the scripted reference controller, not by Dream-1, and the banner says so: model results in the app are
+> precomputed measurements of the trained checkpoints.
 
-![CNC cycle as a workflow: load blank, start machine, wait for "machine done", unload, green light; every step has an error path to a red stack light](docs/img/cnc-workflow.jpg)
+![How it works: build the workflow in the editor, the engine runs it against a MuJoCo cell; a scripted expert records demos, Dream-1 is fine-tuned, every checkpoint is measured on 40 identical scenes, and a decision table says which checkpoint may run which task](docs/img/how-it-works.svg)
+
+![Workflow editor with the CNC cycle: load blank, start machine, wait for "machine done", unload, green light, error paths to a red stack light; below, the run log, the live image of the CNC cell and the cell's devices](docs/img/editor-live-cell.png)
 
 ## The idea
 
@@ -55,7 +58,7 @@ someone has to know how often it succeeds there. Today that means custom glue co
 
 | Execution | Who moves the arm | Labelled in the log as |
 |---|---|---|
-| `mock` backend | nobody (stand-in) | banner "SIMULIERTE API" |
+| `mock` backend | nobody (stand-in) | banner "SIMULATED API" |
 | `sim` backend, cell task | scripted reference controller | **Referenz-Controller** |
 | `real` backend, cell task | only with checkpoint `referenz` (explicit); a learned checkpoint stops the block with a clear message | **Referenz-Controller** |
 | `real` backend, other skills | Dream-1 in MuJoCo (costs credits) | **Simulationslauf** |
@@ -89,6 +92,8 @@ which checkpoint may run which task (`GET /api/results/policy`).
 claim; per-task results are not stable across trainings. The cell fine-tune forgets outside the cells: banana
 6/20 (base) → 0/20, 6 : 0 paired, which meets the pre-registered "harms" rule, so cell checkpoints stay cell-only. A transfer test on an untrained, similar task is
 pre-registered in [`docs/results/TRANSFER_PREREG.md`](docs/results/TRANSFER_PREREG.md).
+
+![Decision table in the app: per task, who runs it today, the base model's score and the approved fine-tune; the banana row shows the cell fine-tune dropping 6/20 to 0/20, so it is excluded there; below, every other fine-tune with its 40-scene score and why it was not approved](docs/img/decision-table.png)
 
 **Check the numbers yourself:** every scored scene is committed in [`docs/results/raw/`](docs/results/raw/)
 (one JSON line per scene and attempt). `CELLS_DIR=docs/results/raw python3 src/Simulation/tools/results_page.py
