@@ -24,6 +24,7 @@ import type {
 import { DEVICE_TYPE_KIND } from './contract'
 import { estimateCredits } from '@/workflow/estimate'
 import { validateWorkflow } from '@/workflow/validate'
+import { createCellsMock } from './cellsMock'
 import { ApiError } from './realClient'
 
 export type MockOptions = {
@@ -498,5 +499,7 @@ export function createMockClient(options: MockOptions = {}): ApiClient {
       devices.delete(id)
       passwords.delete(id)
     },
+
+    ...createCellsMock(now),
   }
 }

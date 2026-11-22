@@ -301,6 +301,117 @@ export const BackendStatusSchema = z.object({
 export type BackendStatus = z.infer<typeof BackendStatusSchema>
 
 // ---------------------------------------------------------------------------
+// Zellen-Leitstand (Backend /api/cells -> Simulationsdienst). Tasks laufen mit dem geskripteten
+// Referenz-Controller, nicht mit Dream-1: keine Credits.
+// ---------------------------------------------------------------------------
+export const CELL_ACTIONS = [
+  'door_open', 'door_close', 'belt_on', 'belt_off', 'cycle_start',
+  'light_red', 'light_yellow', 'light_green', 'light_off', 'auto_on', 'auto_off', 'feed',
+] as const
+export type CellAction = (typeof CELL_ACTIONS)[number]
+
+export const CellSchema = z.object({
+  cell: z.string(),
+  tasks: z.array(z.object({ task: z.string(), arm: z.string(), prompt: z.string() })),
+})
+export type Cell = z.infer<typeof CellSchema>
+
+export const CellTaskResultSchema = z.looseObject({
+  task: z.string(),
+  seed: z.number(),
+  passed: z.boolean(),
+  reason: z.string(),
+})
+export type CellTaskResult = z.infer<typeof CellTaskResultSchema>
+
+export const CellSessionSchema = z.object({
+  cell: z.string(),
+  status: z.string(),
+  sim_seconds: z.number().optional(),
+  busy: z.string().nullable(),
+  sensors: z.record(z.string(), z.unknown()).optional(),
+  last_result: CellTaskResultSchema.optional(),
+  events: z.array(z.looseObject({ t: z.number(), text: z.string(), gate: z.boolean().optional() })),
+})
+export type CellSession = z.infer<typeof CellSessionSchema>
+
+export type CellView = 'overview' | 'robot'
+
+// ---------------------------------------------------------------------------
+// Robotertypen und Fine-Tunes (Backend /api/simulation/robots)
+// ---------------------------------------------------------------------------
+export const FinetuneJobSchema = z.object({
+  job_id: z.string(),
+  status: z.string(),
+  dataset: z.string(),
+  suffix: z.string(),
+  steps: z.number(),
+  price_usd: z.number(),
+  fine_tuned_model: z.string().nullable(),
+  created_at: z.string(),
+})
+export type FinetuneJob = z.infer<typeof FinetuneJobSchema>
+
+export const RobotSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  embodiment: z.string(),
+  skills: z.array(z.string()),
+  fine_tuned_model: z.string().nullable(),
+  finetune_jobs: z.array(FinetuneJobSchema),
+})
+export type Robot = z.infer<typeof RobotSchema>
+
+// ---------------------------------------------------------------------------
+// Fine-Tune-Ergebnisse (Backend /api/results/cells, geschrieben von src/Simulation/tools/results_page.py)
+// ---------------------------------------------------------------------------
+export const OUTCOME_BUCKETS = ['success', 'dropped', 'not_released', 'no_grasp', 'action_error'] as const
+export type OutcomeBucket = (typeof OUTCOME_BUCKETS)[number]
+
+export const ResultModelSchema = z.object({
+  label: z.string(),
+  name: z.string(),
+  what: z.string(),
+  prereg: z.boolean(),
+  k: z.number(),
+  lo: z.number(),
+  hi: z.number(),
+  contact: z.number(),
+  buckets: z.record(z.string(), z.number()),
+  tasks: z.record(z.string(), z.number()),
+  /** je Szene: Ergebnisgruppe, Kontakt ja/nein, Rohergebnis */
+  scenes: z.array(z.tuple([z.string(), z.boolean(), z.string()])),
+  win: z.number().optional(),
+  loss: z.number().optional(),
+  p: z.number().optional(),
+  /** Zeit bis Erfolg (Sim-Sekunden ab erster Modellantwort), nur erfolgreiche Szenen, aufsteigend */
+  times: z.array(z.number()).optional(),
+  t_median: z.number().nullable().optional(),
+  within20: z.number().optional(),
+  within30: z.number().optional(),
+  /** Szenen, die Basis (erster Lauf) und dieses Modell beide lösen, davon schneller */
+  both: z.number().optional(),
+  both_faster: z.number().optional(),
+})
+export type ResultModel = z.infer<typeof ResultModelSchema>
+
+export const CellResultsSchema = z.object({
+  generated_at: z.string(),
+  base: z.string(),
+  tasks: z.array(z.string()),
+  task_names: z.record(z.string(), z.string()),
+  models: z.array(ResultModelSchema),
+  spend: z.object({
+    jobs: z.array(z.object({ name: z.string(), status: z.string(), usd: z.number(), pending: z.number().optional() })),
+    evals: z.record(z.string(), z.number()),
+    credit: z.number(),
+  }),
+  queue: z.array(z.object({ label: z.string(), name: z.string(), eta: z.string(), done: z.boolean() })),
+  public_url: z.string(),
+})
+export type CellResults = z.infer<typeof CellResultsSchema>
+
+// ---------------------------------------------------------------------------
 // Client-Schnittstelle – identisch für "real" und "mock" (N2)
 // ---------------------------------------------------------------------------
 export type ApiMode = 'mock' | 'real'
@@ -344,4 +455,19 @@ export interface ApiClient {
   updateDevice(id: string, input: DeviceInput): Promise<Device>
   /** 409, solange ein gespeicherter Workflow das Gerät verwendet */
   deleteDevice(id: string): Promise<void>
+
+  listCells(): Promise<Cell[]>
+  /** Startet eine Live-Sitzung; eine laufende Sitzung wird beendet. */
+  startCellSession(cell: string): Promise<void>
+  /** null, solange keine Sitzung läuft */
+  getCellSession(): Promise<CellSession | null>
+  cellAction(action: CellAction): Promise<void>
+  /** Task mit dem Referenz-Controller; seed = Szene */
+  cellTask(task: string, seed?: number): Promise<void>
+  endCellSession(): Promise<void>
+  /** Bildadresse für <img>; tick umgeht den Browser-Cache */
+  cellFrameUrl(view: CellView, tick: number): string
+
+  listRobots(): Promise<Robot[]>
+  getCellResults(): Promise<CellResults>
 }

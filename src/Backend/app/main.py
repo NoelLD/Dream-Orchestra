@@ -10,7 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import devices, health, runs, simulation, skills, training, workflows
+from app.api import cells, devices, health, results, runs, simulation, skills, training, workflows
 from app.api.deps import Services
 from app.config import Settings, get_settings
 from app.db import repo
@@ -96,7 +96,7 @@ def create_app(settings: Settings | None = None, factory: Callable[[Settings], S
     app.include_router(health.root)
     api = APIRouter(prefix="/api")
     api.include_router(health.api)
-    for module in (skills, workflows, runs, devices, training, simulation):
+    for module in (skills, workflows, runs, devices, training, simulation, cells, results):
         api.include_router(module.router)
     app.include_router(api)
     return app

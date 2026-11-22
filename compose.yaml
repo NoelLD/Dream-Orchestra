@@ -68,6 +68,7 @@ services:
     volumes:
       - ./src/Backend:/app:ro
       - ./src/Backend/data:/app/data
+      - ./src/Simulation/data/evals/cells:/sim-results:ro
     env_file:
       - path: .env
         required: false

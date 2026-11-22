@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     simulation_url: str = "http://simulation:3001"
     simulation_timeout_s: float = Field(default=10.0, gt=0)
 
+    # Zusammenfassung der Zellen-Fine-Tunes (src/Simulation/tools/results_page.py), schreibgeschützt eingebunden
+    cell_results_path: Path = Path("/sim-results/results.json")
+
     database_path: Path = BACKEND_ROOT / "data" / "dreamorchestra.sqlite3"
     schema_path: Path = BACKEND_ROOT / "models" / "schema.sql"
 

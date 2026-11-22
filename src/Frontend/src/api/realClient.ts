@@ -13,7 +13,11 @@ import {
 import {
   ApiErrorBodySchema,
   BackendStatusSchema,
+  CellResultsSchema,
+  CellSchema,
+  CellSessionSchema,
   DeviceSchema,
+  RobotSchema,
   HealthSchema,
   SkillSchema,
   type ApiClient,
@@ -132,5 +136,21 @@ export function createRealClient(fetchFn: typeof fetch = (...args) => fetch(...a
     createDevice: (input) => request(DeviceSchema, 'POST', '/devices', input),
     updateDevice: (deviceId, input) => request(DeviceSchema, 'PUT', `/devices/${id(deviceId)}`, input),
     deleteDevice: (deviceId) => request(z.undefined(), 'DELETE', `/devices/${id(deviceId)}`),
+
+    listCells: () => request(z.array(CellSchema), 'GET', '/cells'),
+    startCellSession: (cell) => request(z.unknown(), 'POST', `/cells/${id(cell)}/session`).then(() => undefined),
+    getCellSession: () =>
+      request(CellSessionSchema, 'GET', '/cells/session').catch((error: unknown) => {
+        if (error instanceof ApiError && error.code === 'no_session') return null
+        throw error
+      }),
+    cellAction: (action) => request(z.unknown(), 'POST', '/cells/session/action', { action }).then(() => undefined),
+    cellTask: (task, seed) =>
+      request(z.unknown(), 'POST', '/cells/session/task', seed === undefined ? { task } : { task, seed }).then(() => undefined),
+    endCellSession: () => request(z.undefined(), 'DELETE', '/cells/session'),
+    cellFrameUrl: (view, tick) => `${BASE}/cells/session/frame.jpg?view=${view}&t=${tick}`,
+
+    listRobots: () => request(z.array(RobotSchema), 'GET', '/simulation/robots'),
+    getCellResults: () => request(CellResultsSchema, 'GET', '/results/cells'),
   }
 }

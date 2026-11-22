@@ -1,9 +1,11 @@
 import logging
+from pathlib import Path
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.config import Settings
 from tests.conftest import SECRET, wait_for
 
 
@@ -216,3 +218,41 @@ def test_multiple_workflows_list_update_delete(client: TestClient) -> None:
     assert client.delete(f"/api/workflows/{second['id']}").status_code == 404
     assert client.get(f"/api/runs/{run['id']}").json()["workflow_id"] is None  # Lauf bleibt erhalten
     assert [w["name"] for w in client.get("/api/workflows").json()] == ["Erster (neu)"]
+
+
+def test_cells_proxy_forwards_to_simulation(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    services = client.app.state.services  # type: ignore[attr-defined]
+    calls: list[tuple[str, str, Any]] = []
+
+    async def fake_request(method: str, path: str, json: Any = None) -> Any:
+        calls.append((method, path, json))
+        return {"status": "running", "busy": False} if path == "/cells/session" else {"ok": True}
+
+    monkeypatch.setattr(services.simulation, "request", fake_request)
+    assert client.post("/api/cells/cnc/session").status_code == 200
+    assert client.get("/api/cells/session").json()["status"] == "running"
+    assert client.post("/api/cells/session/action", json={"action": "door_open"}).status_code == 200
+    assert client.post("/api/cells/session/task", json={"task": "cnc_load", "seed": 1000}).status_code == 200
+    assert client.post("/api/cells/session/action", json={"action": "explode"}).status_code == 422
+    assert client.delete("/api/cells/session").status_code == 204
+    assert calls == [
+        ("POST", "/cells/cnc/session", None),
+        ("GET", "/cells/session", None),
+        ("POST", "/cells/session/action", {"action": "door_open"}),
+        ("POST", "/cells/session/task", {"task": "cnc_load", "seed": 1000}),
+        ("DELETE", "/cells/session", None),
+    ]
+
+
+def test_cells_proxy_reports_unreachable_simulation(client: TestClient) -> None:
+    for path in ("/api/cells", "/api/simulation/robots", "/api/simulation/budget", "/api/simulation/evals"):
+        response = client.get(path)
+        assert response.status_code == 503, path
+        assert response.json()["error"] == "simulation_unavailable"
+
+
+def test_cell_results_read_from_file(client: TestClient, settings: Settings, tmp_path: Path) -> None:
+    settings.cell_results_path = tmp_path / "results.json"
+    assert client.get("/api/results/cells").status_code == 404
+    settings.cell_results_path.write_text('{"base": "beta-main", "models": []}')
+    assert client.get("/api/results/cells").json() == {"base": "beta-main", "models": []}

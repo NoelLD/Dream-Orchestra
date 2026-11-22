@@ -1,9 +1,11 @@
 ﻿import { ReactFlowProvider } from '@xyflow/react'
+import { CellsView } from '@/cells/CellsView'
 import { AppHeader, MockBanner } from '@/components/AppHeader'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DeviceBar } from '@/devices/DeviceBar'
 import { DevicesView } from '@/devices/DevicesView'
 import { RunLog } from '@/run/RunLog'
+import { ResultsView } from '@/results/ResultsView'
 import { useRunPolling } from '@/run/useRun'
 import { SkillsView } from '@/skills/SkillsView'
 import { Canvas } from '@/workflow/components/Canvas'
@@ -50,8 +52,10 @@ export default function App() {
       <Tabs defaultValue="editor" className="flex min-h-0 flex-1 flex-col gap-0">
         <TabsList className="mx-3 mt-2">
           <TabsTrigger value="editor">Workflow-Editor</TabsTrigger>
+          <TabsTrigger value="cells">Zellen-Leitstand</TabsTrigger>
           <TabsTrigger value="devices">Geräte</TabsTrigger>
           <TabsTrigger value="skills">Skills</TabsTrigger>
+          <TabsTrigger value="results">Roboter &amp; Fine-Tune</TabsTrigger>
         </TabsList>
         <TabsContent value="editor" className="mt-2 min-h-0 flex-1 border-t bg-white">
           <WorkflowEditor pollError={poll.error} />
@@ -61,6 +65,12 @@ export default function App() {
         </TabsContent>
         <TabsContent value="skills" className="min-h-0 flex-1 overflow-auto">
           <SkillsView />
+        </TabsContent>
+        <TabsContent value="cells" className="min-h-0 flex-1 overflow-auto">
+          <CellsView />
+        </TabsContent>
+        <TabsContent value="results" className="min-h-0 flex-1 overflow-auto">
+          <ResultsView />
         </TabsContent>
       </Tabs>
     </div>
