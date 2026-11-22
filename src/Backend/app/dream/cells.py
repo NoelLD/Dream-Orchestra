@@ -193,6 +193,7 @@ class CellBridge:
         self.max_age_s = max(3 * poll_s, 2.0)
         self._last_ok: float | None = None
         self._fresh_sensors: set[str] = set()
+        self._last_sim_s = -1.0  # Simulationszeit des zuletzt gespiegelten Schnappschusses
         self._last_error = "noch keine Verbindung zur Zelle"
         self._task: asyncio.Task[None] | None = None
 
@@ -203,10 +204,20 @@ class CellBridge:
             self._last_ok = None
             self._last_error = "keine Zellen-Sitzung" if exc.code == "no_session" else exc.detail
             return
+        self._mirror(session)
+
+    def _mirror(self, session: Any) -> None:
+        """Sensoren eines Schnappschusses in die Geräte schreiben. Ein älterer Schnappschuss (z. B. eine Abfrage, die
+        vor einem Maschinenstart losging und danach ankommt) überschreibt keinen neueren."""
         if not isinstance(session, dict) or session.get("status") != "running":
             self._last_ok = None
             self._last_error = "Zellen-Sitzung ist nicht bereit"
             return
+        sim_s = session.get("sim_seconds")
+        if isinstance(sim_s, int | float):
+            if self._last_sim_s - 5.0 < sim_s < self._last_sim_s:  # leicht älter: verwerfen (viel älter = neue Sitzung)
+                return
+            self._last_sim_s = float(sim_s)
         sensors = session.get("sensors") or {}
         if not isinstance(sensors, dict):
             sensors = {}
@@ -262,6 +273,9 @@ class CellBridge:
         while time.monotonic() < deadline:
             session = await self.api.request("GET", "/cells/session")
             if ((session or {}).get("sensors") or {}).get("machine_running"):
+                # Quittung: die Geräte sofort auf diesen Stand bringen, damit ein "fertig" vom vorigen Zyklus
+                # nicht als frisch gilt, bevor die nächste Abfrage kommt
+                self._mirror(session)
                 return
             for event in _after((session or {}).get("events") or [], marker):
                 if event.get("gate") is False:

@@ -271,6 +271,7 @@ function DeleteDialog({ device, onClose }: { device: Device; onClose: () => void
 }
 
 function formatValue(d: Device): string {
+  if (d.available === false) return 'nicht verfügbar'
   if (typeof d.value === 'number') return `${d.value}${d.unit ? ` ${d.unit}` : ''}`
   return d.value ? 'an' : 'aus'
 }

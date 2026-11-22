@@ -60,6 +60,18 @@ function SensorControl({ device, onSet }: { device: Device; onSet: (value: Devic
   )
 }
 
+function Unavailable({ device }: { device: Device }) {
+  return (
+    <span
+      className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-medium text-red-900"
+      title={device.unavailable_reason ?? 'Wert gilt gerade nicht'}
+      data-testid={`device-unavailable-${device.id}`}
+    >
+      nicht verfügbar
+    </span>
+  )
+}
+
 function ActuatorDisplay({ device }: { device: Device }) {
   const on = device.value === true
   if (device.type === 'lamp') {
@@ -143,7 +155,11 @@ export function DeviceBar() {
               {sensors.map((d) => (
                 <li key={d.id} className="flex items-center justify-between gap-2" data-testid={`device-${d.id}`}>
                   <DeviceName device={d} htmlFor={`device-${d.id}`} />
-                  <SensorControl device={d} onSet={(value) => setDevice.mutate({ id: d.id, value })} />
+                  {d.available === false ? (
+                    <Unavailable device={d} />
+                  ) : (
+                    <SensorControl device={d} onSet={(value) => setDevice.mutate({ id: d.id, value })} />
+                  )}
                 </li>
               ))}
             </ul>

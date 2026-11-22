@@ -118,11 +118,17 @@ class DeviceRegistry(VirtualAdapter):
         # Quittung: wird nach dem Schalten eines Aktors im Ablauf abgewartet (z. B. Zellen-Aktion)
         self.apply_hooks: list[Callable[[Device], Awaitable[None]]] = []
 
-    def read(self, device_id: str) -> Device:
-        """Wert für den Ablauf: wie `get`, aber Fehler statt eines veralteten Werts."""
+    def unavailable_reason(self, device_id: str) -> str | None:
+        """Warum der Wert gerade nicht gilt (Zelle getrennt, Wert zu alt), sonst None."""
         for guard in self.guards:
             if (reason := guard(device_id)) is not None:
-                raise UpstreamError(reason, status_code=503, code="sensor_unavailable")
+                return reason
+        return None
+
+    def read(self, device_id: str) -> Device:
+        """Wert für den Ablauf: wie `get`, aber Fehler statt eines veralteten Werts."""
+        if (reason := self.unavailable_reason(device_id)) is not None:
+            raise UpstreamError(reason, status_code=503, code="sensor_unavailable")
         return self.get(device_id)
 
     async def apply(self, device_id: str, value: bool | float) -> Device:

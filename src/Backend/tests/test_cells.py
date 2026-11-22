@@ -1,6 +1,7 @@
 """Zellen im Workflow: Prompt-Blöcke mit Zellen-Tasks und Zellen-Geräte gegen einen nachgebauten Dienst, ohne Netz."""
 
 import json
+import pathlib
 
 import httpx
 import pytest
@@ -36,6 +37,7 @@ class FakeCells:
         self.actions: list[str] = []
         self.finished_part = False
         self.block_cycle = False
+        self.cycle_left = 0
 
     def _event(self, text: str, **data: object) -> None:
         assert self.session is not None
@@ -65,6 +67,12 @@ class FakeCells:
             case "GET", "/cells/session":
                 if self.session is None:
                     return httpx.Response(409, json={"error": "no_session", "detail": "no cell session"})
+                self.session["sim_seconds"] = self.session.get("sim_seconds", 0.0) + 0.5
+                if self.cycle_left > 0:
+                    self.cycle_left -= 1
+                    if self.cycle_left == 0:
+                        self.session["sensors"].update(machine_running=False, machine_done=True)
+                        self.finished_part = True
                 if self.session["busy"] and self.left > 0:
                     self.left -= 1
                     if self.left == 0:
@@ -94,8 +102,8 @@ class FakeCells:
                     if self.block_cycle or not self.session["sensors"]["raw_part_on_tray"]:
                         self._event("Zyklus gesperrt: kein Rohteil auf der Platte", gate=False)
                     else:
-                        self.session["sensors"].update(machine_running=True, machine_done=True)
-                        self.finished_part = True
+                        self.session["sensors"].update(machine_running=True, machine_done=False)
+                        self.cycle_left = 2  # Abfragen bis "fertig"
                 return httpx.Response(202, json={"queued": body["action"]})
             case "DELETE", "/cells/session":
                 self.session = None
@@ -344,3 +352,47 @@ async def test_cell_tasks_cost_no_credits_and_error_path_is_reported() -> None:
     )
     await engine.run()
     assert sink.blocks[-1] == "err" and engine.handled_errors == 1 and sink.credits == 0
+
+
+@pytest.mark.asyncio
+async def test_repeated_cycle_does_not_reuse_previous_done() -> None:
+    fake = FakeCells()
+    api = SimulationApi("http://sim", transport=httpx.MockTransport(fake))
+    await api.request("POST", "/cells/cnc/session")
+    registry, bridge = registry_with(api)
+    fake.session["sensors"]["raw_part_on_tray"] = True  # type: ignore[index]
+    await registry.apply("zelle-cnc-maschine", True)
+    await bridge.poll_once()
+    assert registry.read("zelle-maschine-fertig").value is True  # first cycle done
+    await registry.apply("zelle-cnc-maschine", True)  # second cycle, no poll in between
+    assert registry.read("zelle-maschine-fertig").value is False  # the ack refreshed the sensor
+    assert registry.read("zelle-cnc-maschine").value is True  # machine_running
+
+
+@pytest.mark.asyncio
+async def test_older_snapshot_does_not_overwrite_newer() -> None:
+    fake = FakeCells()
+    api = SimulationApi("http://sim", transport=httpx.MockTransport(fake))
+    await api.request("POST", "/cells/cnc/session")
+    registry, bridge = registry_with(api)
+    sensors = {"machine_done": False, "machine_running": True}
+    bridge._mirror({"status": "running", "sim_seconds": 10.0, "sensors": sensors})
+    bridge._mirror({"status": "running", "sim_seconds": 9.5, "sensors": {**sensors, "machine_done": True}})
+    assert registry.read("zelle-maschine-fertig").value is False
+    bridge._mirror({"status": "running", "sim_seconds": 0.5, "sensors": {**sensors, "machine_done": True}})
+    assert registry.read("zelle-maschine-fertig").value is True  # much older = new session, accepted
+
+
+def test_devices_api_reports_unavailable_cell_sensor(tmp_path: pathlib.Path) -> None:
+    from fastapi.testclient import TestClient
+
+    from app.config import Settings
+    from app.main import create_app
+
+    settings = Settings(dream_api_mode="sim", database_path=tmp_path / "d.sqlite3", simulation_url="http://127.0.0.1:9")
+    with TestClient(create_app(settings)) as client:
+        devices = {d["id"]: d for d in client.get("/api/devices").json()}
+    sensor = devices["zelle-maschine-fertig"]
+    assert sensor["available"] is False and "nicht verfügbar" in sensor["unavailable_reason"]
+    assert devices["zelle-ampel-rot"]["available"] is True  # actuators have no freshness
+    assert devices["lichtschranke"]["available"] is True

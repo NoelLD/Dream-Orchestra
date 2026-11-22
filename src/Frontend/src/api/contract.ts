@@ -261,6 +261,9 @@ export const DeviceSchema = z.object({
   config: DeviceConfigSchema,
   /** Werte werden simuliert (noch keine echte Verbindung) */
   simulated: z.boolean(),
+  /** false: Wert gilt gerade nicht (z. B. Zelle getrennt) – dann Grund statt Wert anzeigen */
+  available: z.boolean().optional(),
+  unavailable_reason: z.string().nullable().optional(),
 })
 export type Device = z.infer<typeof DeviceSchema>
 

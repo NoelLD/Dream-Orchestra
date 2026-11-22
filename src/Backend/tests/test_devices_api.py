@@ -8,6 +8,23 @@ from app.main import create_app
 MQTT = {"protocol": "mqtt", "host": "broker", "topic": "halle/band2", "password": "geheim"}
 
 
+def test_device_responses_expose_unavailable_values_and_recovery(client: TestClient) -> None:
+    registry = client.app.state.services.devices
+    registry.set("lichtschranke", True)
+    registry.guards.append(lambda key: "Zelle nicht erreichbar" if key == "lichtschranke" else None)
+    devices = {d["id"]: d for d in client.get("/api/devices").json()}
+    assert devices["lichtschranke"]["available"] is False
+    assert devices["lichtschranke"]["unavailable_reason"] == "Zelle nicht erreichbar"
+    assert devices["lampe"]["available"] is True
+    # A value update must not accidentally drop the unavailable flag.
+    updated = client.put("/api/devices/lichtschranke/value", json={"value": False}).json()
+    assert updated["available"] is False
+    registry.guards.clear()
+    recovered = {d["id"]: d for d in client.get("/api/devices").json()}["lichtschranke"]
+    assert recovered["available"] is True
+    assert recovered["unavailable_reason"] is None
+
+
 def save_workflow(client: TestClient, name: str, block: dict[str, Any]) -> None:
     definition = {
         "blocks": [{"id": "s", "type": "start"}, {"id": "x", **block}, {"id": "e", "type": "end"}],

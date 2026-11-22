@@ -128,4 +128,12 @@ describe('realer API-Client', () => {
     expect(f.calls[0]?.url).toBe('/api/workflows/9')
     expect(f.calls[0]?.init?.method).toBe('DELETE')
   })
+
+  it('liest die Verfügbarkeit eines Geräts', async () => {
+    const stale = { ...device, available: false, unavailable_reason: 'Zelle nicht erreichbar' }
+    const api = createRealClient(fakeFetch(() => json([stale])).fn)
+    const [d] = await api.listDevices()
+    expect(d?.available).toBe(false)
+    expect(d?.unavailable_reason).toBe('Zelle nicht erreichbar')
+  })
 })

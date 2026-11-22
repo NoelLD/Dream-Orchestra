@@ -88,6 +88,8 @@ class DeviceOut(BaseModel):
     protocol: str = Field(description="virtual | mqtt | opcua")
     config: dict[str, Any] = Field(description="Protokoll-Einstellungen ohne Passwort (stattdessen password_set)")
     simulated: bool = Field(default=True, description="Werte werden simuliert (noch keine echte Verbindung)")
+    available: bool = Field(default=True, description="False: Wert gilt gerade nicht (z. B. Zelle getrennt)")
+    unavailable_reason: str | None = Field(default=None, description="Grund, wenn available False ist")
 
 
 class DeviceValue(BaseModel):
