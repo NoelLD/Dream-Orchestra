@@ -3,6 +3,8 @@
 .git
 .venv
 **/__pycache__
-src/Backend/data/
+src/Backend/data/*.sqlite3-journal
+src/Backend/data/*.sqlite3-wal
+src/Backend/data/*.sqlite3-shm
 **/node_modules
 **/dist

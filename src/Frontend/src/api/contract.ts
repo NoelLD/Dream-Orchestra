@@ -337,7 +337,7 @@ export const CellSessionSchema = z.object({
   sim_seconds: z.number().optional(),
   busy: z.string().nullable(),
   sensors: z.record(z.string(), z.unknown()).optional(),
-  last_result: CellTaskResultSchema.optional(),
+  last_result: CellTaskResultSchema.nullable().optional(),
   events: z.array(z.looseObject({ t: z.number(), text: z.string(), gate: z.boolean().optional() })),
 })
 export type CellSession = z.infer<typeof CellSessionSchema>

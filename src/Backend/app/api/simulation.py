@@ -18,8 +18,33 @@ async def list_skills(services: Svc) -> Any:
     return await services.simulation.request("GET", "/skills")
 
 
+MOCK_ROBOTS: list[dict[str, Any]] = [
+    {
+        "name": "yam-sim",
+        "description": "Two YAM arms in the simulation",
+        "embodiment": "yam-sim",
+        "skills": ["pick-banana", "pick-apple", "banana-to-plate", "apple-to-bowl"],
+        "fine_tuned_model": "dream-1-ft:317db52a-yam-cells-c500-rep2",
+        "finetune_jobs": [
+            {
+                "job_id": "ftj_c500_rep2",
+                "status": "succeeded",
+                "dataset": "yam-cells-c500",
+                "suffix": "yam-cells-c500-rep2",
+                "steps": 500,
+                "price_usd": 24.0,
+                "fine_tuned_model": "dream-1-ft:317db52a-yam-cells-c500-rep2",
+                "created_at": "2026-11-22T01:30:00Z",
+            },
+        ],
+    },
+]
+
+
 @router.get("/robots", summary="Robotertypen: Embodiment, Skills, aktiver Checkpoint, Fine-Tune-Jobs")
 async def list_robots(services: Svc) -> Any:
+    if services.settings.dream_api_mode == "mock":
+        return MOCK_ROBOTS
     return await services.simulation.request("GET", "/robots")
 
 

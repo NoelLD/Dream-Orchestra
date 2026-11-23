@@ -11,10 +11,11 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN python -m pip install --no-cache-dir --no-compile --only-binary=:all: -r requirements.txt
 
+ARG CACHEBUST=1
 COPY src/Backend/ ./
+COPY deploy/seed/dreamorchestra.db /app/data/dreamorchestra.sqlite3
 COPY docs/results/ /results-snapshot/
 
-RUN mkdir -p data
 RUN chown -R 10001:10001 /app/data
 
 USER 10001:10001

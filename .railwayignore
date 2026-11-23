@@ -1,0 +1,10 @@
+.env
+.env.*
+.git
+.venv
+**/__pycache__
+**/node_modules
+**/dist
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
